@@ -144,6 +144,7 @@ function neverina() {
       try {
         const rf = async (c) => {
           const v = await c.readValue();
+          if (v.byteLength < 4) return null; // uninitialized characteristic
           return v.getFloat32(0, true);
         };
         const ru = async (c) => {

@@ -18,7 +18,7 @@
 </head>
 <body class="min-h-screen bg-base-200">
 
-  <div x-data="neverina()" class="max-w-2xl mx-auto p-4 space-y-6">
+  <div x-data="{ ...neverina(), activeTab: 'data' }" class="max-w-2xl mx-auto p-4 space-y-4">
 
     <!-- ── Header ─────────────────────────────────────────────────── -->
     <div class="flex items-center justify-between">
@@ -37,217 +37,6 @@
       </button>
     </div>
 
-    <!-- ── Status cards ────────────────────────────────────────────── -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" x-show="connected">
-
-      <!-- Row 1 col 1 — Temperature -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4 items-center text-center">
-          <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temperature</p>
-          <p class="text-3xl font-bold mt-1" x-text="status.temp !== null ? status.temp.toFixed(1) + ' °C' : '—'"></p>
-        </div>
-      </div>
-
-      <!-- Row 1 col 2 — Ambient temperature -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4 items-center text-center">
-          <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Ambient temp</p>
-          <p class="text-3xl font-bold mt-1" x-text="status.ambTemp !== null ? status.ambTemp.toFixed(1) + ' °C' : '—'"></p>
-        </div>
-      </div>
-
-      <!-- Row 2 col 1 — Compressor state -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4 items-center text-center">
-          <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Compressor</p>
-          <div class="mt-2">
-            <span
-              class="badge badge-lg font-semibold"
-              :class="stateBadgeClass()"
-              x-text="stateLabel()"
-            ></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Row 2 col 2 — Time in state -->
-      <div class="card bg-base-100 shadow">
-        <div class="card-body p-4 items-center text-center">
-          <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">In state</p>
-          <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.stateTime)"></p>
-        </div>
-      </div>
-
-      <!-- Row 3 — Total active time, spans both columns -->
-      <div class="card bg-base-100 shadow sm:col-span-2">
-        <div class="card-body p-4 items-center text-center">
-          <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Total active time</p>
-          <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.uptime)"></p>
-        </div>
-      </div>
-      
-      <!-- Row 4 — Device status / errors, spans both columns -->
-      <div class="card shadow sm:col-span-2"
-           :class="errorList().length > 0 ? 'bg-error/10' : 'bg-success/10'">
-        <div class="card-body p-4 flex-row items-center gap-3">
-          <span class="text-xl" x-text="errorList().length > 0 ? '✖' : '✔'"></span>
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-wide"
-               :class="errorList().length > 0 ? 'text-error' : 'text-success'"
-               x-text="errorList().length > 0 ? 'Device errors' : 'All systems OK'"></p>
-            <template x-if="errorList().length > 0">
-              <ul class="mt-1 space-y-0.5">
-                <template x-for="err in errorList()" :key="err">
-                  <li class="text-sm text-error" x-text="err"></li>
-                </template>
-              </ul>
-            </template>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ── History chart ────────────────────────────────────────────── -->
-    <div class="card bg-base-100 shadow" x-show="connected">
-      <div class="card-body space-y-3">
-        <div class="flex items-center justify-between">
-          <h2 class="card-title text-base">History</h2>
-          <button class="btn btn-sm btn-primary" @click="loadHistory()" :disabled="histLoading">
-            <span x-show="histLoading" class="loading loading-spinner loading-xs"></span>
-            <span x-text="histLoading ? 'Loading…' : 'Load'"></span>
-            </button>
-            </div>
-        <p x-show="histError" class="text-xs text-error" x-text="histError"></p>
-        <canvas id="histChart" height="200"></canvas>
-      </div>
-    </div>
-
-    <!-- ── Config form ─────────────────────────────────────────────── -->
-    <div class="card bg-base-100 shadow" x-show="connected">
-      <div class="card-body space-y-5">
-
-        <div class="flex items-center justify-between">
-          <h2 class="card-title">Parameters</h2>
-          <div class="flex items-center gap-2">
-            <span x-show="saveError" class="text-xs text-error" x-text="saveError"></span>
-            <button class="btn btn-sm btn-ghost" @click="readAll()" :disabled="saving">Read</button>
-            <button class="btn btn-sm btn-primary" @click="saveAll()" :disabled="saving">
-              <span x-show="saving" class="loading loading-spinner loading-xs"></span>
-              <span x-text="saving ? 'Saving…' : 'Save all'"></span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Temperature thresholds -->
-        <div>
-          <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Temperature thresholds</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            <label class="form-control">
-              <div class="label"><span class="label-text">Stop at (°C)</span></div>
-              <input type="number" step="0.5" class="input input-bordered input-sm"
-                x-model.number="params.tempStop" />
-              <div class="label"><span class="label-text-alt text-base-content/40">Range −18 to 50</span></div>
-            </label>
-
-            <label class="form-control">
-              <div class="label"><span class="label-text">Start at (°C)</span></div>
-              <input type="number" step="0.5" class="input input-bordered input-sm"
-                x-model.number="params.tempStart" />
-              <div class="label"><span class="label-text-alt text-base-content/40">Range −18 to 50</span></div>
-            </label>
-
-          </div>
-        </div>
-
-        <div class="divider my-0"></div>
-
-        <!-- Timings -->
-        <div>
-          <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Timings (seconds)</p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-            <label class="form-control">
-              <div class="label"><span class="label-text">Min off time</span></div>
-              <input type="number" step="10" min="120" max="600"
-                class="input input-bordered input-sm"
-                :class="validationErrors.minOff ? 'input-error' : ''"
-                x-model.number="params.minOff"
-                @input="validationErrors.minOff = null" />
-              <div class="label">
-                <span class="label-text-alt"
-                  :class="validationErrors.minOff ? 'text-error' : 'text-base-content/40'"
-                  x-text="validationErrors.minOff || '120 – 600 s (2 – 10 min)'"></span>
-              </div>
-            </label>
-
-            <label class="form-control">
-              <div class="label"><span class="label-text">Max run time</span></div>
-              <input type="number" step="60" min="600" max="7200"
-                class="input input-bordered input-sm"
-                :class="validationErrors.maxRun ? 'input-error' : ''"
-                x-model.number="params.maxRun"
-                @input="validationErrors.maxRun = null" />
-              <div class="label">
-                <span class="label-text-alt"
-                  :class="validationErrors.maxRun ? 'text-error' : 'text-base-content/40'"
-                  x-text="validationErrors.maxRun || '600 – 7200 s (10 min – 2 h)'"></span>
-              </div>
-            </label>
-
-            <label class="form-control">
-              <div class="label"><span class="label-text">Cooldown time</span></div>
-              <input type="number" step="30" min="120" max="1800"
-                class="input input-bordered input-sm"
-                :class="validationErrors.cooldown ? 'input-error' : ''"
-                x-model.number="params.cooldown"
-                @input="validationErrors.cooldown = null" />
-              <div class="label">
-                <span class="label-text-alt"
-                  :class="validationErrors.cooldown ? 'text-error' : 'text-base-content/40'"
-                  x-text="validationErrors.cooldown || '120 – 1800 s (2 – 30 min)'"></span>
-              </div>
-            </label>
-
-            <label class="form-control">
-              <div class="label"><span class="label-text">Temp interval</span></div>
-              <input type="number" step="1" min="5" max="60"
-                class="input input-bordered input-sm"
-                :class="validationErrors.tempInt ? 'input-error' : ''"
-                x-model.number="params.tempInt"
-                @input="validationErrors.tempInt = null" />
-              <div class="label">
-                <span class="label-text-alt"
-                  :class="validationErrors.tempInt ? 'text-error' : 'text-base-content/40'"
-                  x-text="validationErrors.tempInt || '5 – 60 s'"></span>
-              </div>
-            </label>
-
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- ── OTA ───────────────────────────────────────────────────────── -->
-    <div class="card bg-base-100 shadow" x-show="connected">
-      <div class="card-body">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h2 class="card-title text-base">Firmware update</h2>
-            <p class="text-xs text-base-content/50 mt-0.5">
-              The device will disconnect, stop the thermostat, and wait for a
-              firmware upload at <code>http://&lt;device-ip&gt;/update</code>.
-            </p>
-          </div>
-          <button class="btn btn-error btn-outline btn-sm shrink-0" @click="triggerOta()">
-            Enter OTA mode
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- ── Placeholder when disconnected ──────────────────────────── -->
     <div class="hero py-16" x-show="!connected">
       <div class="hero-content text-center">
@@ -256,6 +45,232 @@
           <p class="text-xs text-base-content/30 mt-2">Requires Chrome on Desktop or Android.</p>
         </div>
       </div>
+    </div>
+
+    <!-- ── Tabs ───────────────────────────────────────────────────── -->
+    <div x-show="connected" class="space-y-4">
+    
+      <div role="tablist" class="tabs tabs-boxed">
+        <button role="tab" class="tab" :class="activeTab === 'data' && 'tab-active'"
+          @click="activeTab = 'data'">Data</button>
+        <button role="tab" class="tab" :class="activeTab === 'parameters' && 'tab-active'"
+          @click="activeTab = 'parameters'">Parameters</button>
+        <button role="tab" class="tab" :class="activeTab === 'ota' && 'tab-active'" @click="activeTab = 'ota'">OTA</button>
+      </div>
+    
+      <!-- ── Tab: Data ──────────────────────────────────────────────── -->
+      <div x-show="activeTab === 'data'" class="space-y-4">
+    
+        <!-- Status cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temperature</p>
+              <p class="text-3xl font-bold mt-1" x-text="status.temp !== null ? status.temp.toFixed(1) + ' °C' : '—'"></p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Ambient temp</p>
+              <p class="text-3xl font-bold mt-1" x-text="status.ambTemp !== null ? status.ambTemp.toFixed(1) + ' °C' : '—'"></p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Compressor</p>
+              <div class="mt-2">
+                <span class="badge badge-lg font-semibold" :class="stateBadgeClass()" x-text="stateLabel()"></span>
+                </div>
+                </div>
+                </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">In state</p>
+              <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.stateTime)"></p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow sm:col-span-2">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Total active time</p>
+              <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.uptime)"></p>
+            </div>
+          </div>
+
+          <div class="card shadow sm:col-span-2" :class="errorList().length > 0 ? 'bg-error/10' : 'bg-success/10'">
+            <div class="card-body p-4 flex-row items-center gap-3">
+              <span class="text-xl" x-text="errorList().length > 0 ? '✖' : '✔'"></span>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide"
+                  :class="errorList().length > 0 ? 'text-error' : 'text-success'"
+                  x-text="errorList().length > 0 ? 'Device errors' : 'All systems OK'"></p>
+                <template x-if="errorList().length > 0">
+                  <ul class="mt-1 space-y-0.5">
+                    <template x-for="err in errorList()" :key="err">
+                      <li class="text-sm text-error" x-text="err"></li>
+                    </template>
+                  </ul>
+                </template>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- History chart -->
+        <div class="card bg-base-100 shadow">
+          <div class="card-body space-y-3">
+            <div class="flex items-center justify-between">
+              <h2 class="card-title text-base">History</h2>
+              <button class="btn btn-sm btn-primary" @click="loadHistory()" :disabled="histLoading">
+                <span x-show="histLoading" class="loading loading-spinner loading-xs"></span>
+                <span x-text="histLoading ? 'Loading…' : 'Load'"></span>
+              </button>
+            </div>
+            <p x-show="histError" class="text-xs text-error" x-text="histError"></p>
+            <canvas id="histChart" height="200"></canvas>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" x-show="histStateTotals.totalMs > 0">
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">OFF</p>
+                <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.offMs / 1000))"></p>
+                <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.offMs))"></p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">CoolDown</p>
+                <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.cooldownMs / 1000))"></p>
+                <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.cooldownMs))"></p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">ON</p>
+                <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.onMs / 1000))"></p>
+                <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
+              </div>
+            </div>
+            </div>
+            </div>
+
+      </div>
+      
+      <!-- ── Tab: Parameters ────────────────────────────────────────── -->
+      <div x-show="activeTab === 'parameters'">
+        <div class="card bg-base-100 shadow">
+          <div class="card-body space-y-5">
+
+            <div class="flex items-center justify-between">
+              <h2 class="card-title">Parameters</h2>
+              <div class="flex items-center gap-2">
+                <span x-show="saveError" class="text-xs text-error" x-text="saveError"></span>
+                <button class="btn btn-sm btn-ghost" @click="readAll()" :disabled="saving">Read</button>
+                <button class="btn btn-sm btn-primary" @click="saveAll()" :disabled="saving">
+                  <span x-show="saving" class="loading loading-spinner loading-xs"></span>
+                  <span x-text="saving ? 'Saving…' : 'Save all'"></span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Temperature thresholds -->
+            <div>
+              <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Temperature thresholds</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Stop at (°C)</span></div>
+                  <input type="number" step="0.5" class="input input-bordered input-sm" x-model.number="params.tempStop" />
+                  <div class="label"><span class="label-text-alt text-base-content/40">Range −18 to 50</span></div>
+                  </label>
+
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Start at (°C)</span></div>
+                  <input type="number" step="0.5" class="input input-bordered input-sm" x-model.number="params.tempStart" />
+                  <div class="label"><span class="label-text-alt text-base-content/40">Range −18 to 50</span></div>
+                  </label>
+
+              </div>
+              </div>
+
+            <div class="divider my-0"></div>
+
+            <!-- Timings -->
+            <div>
+              <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Timings (seconds)</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Min off time</span></div>
+                  <input type="number" step="10" min="120" max="600" class="input input-bordered input-sm"
+                    :class="validationErrors.minOff ? 'input-error' : ''" x-model.number="params.minOff"
+                    @input="validationErrors.minOff = null" />
+                  <div class="label">
+                    <span class="label-text-alt" :class="validationErrors.minOff ? 'text-error' : 'text-base-content/40'"
+                      x-text="validationErrors.minOff || '120 – 600 s (2 – 10 min)'"></span>
+                  </div>
+                </label>
+
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Max run time</span></div>
+                  <input type="number" step="60" min="600" max="7200" class="input input-bordered input-sm"
+                    :class="validationErrors.maxRun ? 'input-error' : ''" x-model.number="params.maxRun"
+                    @input="validationErrors.maxRun = null" />
+                  <div class="label">
+                    <span class="label-text-alt" :class="validationErrors.maxRun ? 'text-error' : 'text-base-content/40'"
+                      x-text="validationErrors.maxRun || '600 – 7200 s (10 min – 2 h)'"></span>
+                  </div>
+                </label>
+
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Cooldown time</span></div>
+                  <input type="number" step="30" min="120" max="1800" class="input input-bordered input-sm"
+                    :class="validationErrors.cooldown ? 'input-error' : ''" x-model.number="params.cooldown"
+                    @input="validationErrors.cooldown = null" />
+                  <div class="label">
+                    <span class="label-text-alt" :class="validationErrors.cooldown ? 'text-error' : 'text-base-content/40'"
+                      x-text="validationErrors.cooldown || '120 – 1800 s (2 – 30 min)'"></span>
+                  </div>
+                </label>
+
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Temp interval</span></div>
+                  <input type="number" step="1" min="5" max="60" class="input input-bordered input-sm"
+                    :class="validationErrors.tempInt ? 'input-error' : ''" x-model.number="params.tempInt"
+                    @input="validationErrors.tempInt = null" />
+                  <div class="label">
+                    <span class="label-text-alt" :class="validationErrors.tempInt ? 'text-error' : 'text-base-content/40'"
+                      x-text="validationErrors.tempInt || '5 – 60 s'"></span>
+                  </div>
+                </label>
+
+              </div>
+              </div>
+
+          </div>
+          </div>
+      </div>
+
+      <!-- ── Tab: OTA ───────────────────────────────────────────────── -->
+      <div x-show="activeTab === 'ota'">
+        <div class="card bg-base-100 shadow">
+          <div class="card-body">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 class="card-title text-base">Firmware update</h2>
+                <p class="text-xs text-base-content/50 mt-0.5">
+                  The device will disconnect, stop the thermostat, and wait for a
+                  firmware upload at <code>http://&lt;device-ip&gt;/update</code>.
+                </p>
+              </div>
+              <button class="btn btn-error btn-outline btn-sm shrink-0" @click="triggerOta()">
+                Enter OTA mode
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
   </div>

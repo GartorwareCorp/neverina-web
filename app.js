@@ -74,6 +74,7 @@ function neverina() {
     tempRecords: [], // { t: AbsMs (Number), v: float }
     ambRecords: [], // { t: AbsMs (Number), v: float }  SHT30
     stateRecords: [], // { t: AbsMs (Number), s: 0|1|2 }
+    histStateTotals: { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 },
     _nextHistRequestId: 1,
     _chart: null,
 
@@ -104,6 +105,7 @@ function neverina() {
           this.connected = false;
           this.deviceName = null;
           this.histAvailable = false;
+          this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
           this.status = { temp: null, ambTemp: null, state: null, stateTime: null, errors: null, uptime: null };
           this._chars = {};
         });
@@ -263,6 +265,17 @@ function neverina() {
       const s = secs % 60;
       if (s > 0) return `${h}h ${m}m ${s}s`;
       return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    },
+
+    formatPercent(value) {
+      if (!Number.isFinite(value)) return "0.0%";
+      return value.toFixed(1) + "%";
+    },
+
+    histStatePercent(ms) {
+      const total = this.histStateTotals.totalMs;
+      if (!total || total <= 0) return 0;
+      return (ms * 100) / total;
     },
 
     // ── Private ────────────────────────────────────────────────
@@ -467,7 +480,7 @@ function neverina() {
     },
 
     _buildChart() {
-      const canvas = document.getElementById("histChart");
+      let canvas = document.getElementById("histChart");
       if (!canvas) return;
 
       if (this._chart) {
@@ -475,27 +488,104 @@ function neverina() {
         this._chart = null;
       }
 
+      // Replace the canvas node so Chart.js always gets a fresh 2D context.
+      // Reusing the same canvas after destroy() can leave the context in a bad
+      // state and cause the chart to silently not render on subsequent loads.
+      const parent = canvas.parentNode;
+      const fresh = document.createElement("canvas");
+      fresh.id = canvas.id;
+      const explicitHeight = canvas.getAttribute("height");
+      if (explicitHeight) fresh.setAttribute("height", explicitHeight);
+      parent.replaceChild(fresh, canvas);
+      canvas = fresh;
+
       const now = Date.now();
 
-      // Filter out -127 (sensor disconnected) for temperature
-      const tempData = this.tempRecords.filter((r) => r.v !== -127).map((r) => ({ x: r.t, y: r.v }));
-      if (tempData.length > 0) {
-        tempData.push({ x: now, y: tempData[tempData.length - 1].y });
+      // Build a common timeline and forward-fill previous values on each series.
+      // SENSOR_DISCONNECTED (-127) is mapped to null so Chart.js renders a gap in the line.
+      const tempSource = this.tempRecords.map((r) => ({ x: r.t, y: r.v === SENSOR_DISCONNECTED ? null : r.v }));
+      const ambSource = this.ambRecords.map((r) => ({ x: r.t, y: r.v === SENSOR_DISCONNECTED ? null : r.v }));
+      const stateSource = this.stateRecords.map((r) => ({ x: r.t, y: r.s }));
+
+      if (tempSource.length > 0) tempSource.push({ x: now, y: tempSource[tempSource.length - 1].y });
+      if (ambSource.length > 0) ambSource.push({ x: now, y: ambSource[ambSource.length - 1].y });
+      if (stateSource.length > 0) stateSource.push({ x: now, y: stateSource[stateSource.length - 1].y });
+
+      const timeline = [...new Set([...tempSource, ...ambSource, ...stateSource].map((p) => p.x))].sort(
+        (a, b) => a - b,
+      );
+      if (timeline.length === 0) {
+        this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
+        return;
       }
 
-      const ambData = this.ambRecords.filter((r) => r.v !== -127).map((r) => ({ x: r.t, y: r.v }));
-      if (ambData.length > 0) {
-        ambData.push({ x: now, y: ambData[ambData.length - 1].y });
-      }
+      const alignSeriesToTimeline = (source, defaultValue) => {
+        let srcIdx = 0;
+        let lastY = defaultValue;
+        const aligned = [];
+        for (const x of timeline) {
+          while (srcIdx < source.length && source[srcIdx].x <= x) {
+            lastY = source[srcIdx].y;
+            srcIdx += 1;
+          }
+          aligned.push({ x, y: lastY });
+        }
+        return aligned;
+      };
 
-      const stateData = this.stateRecords.map((r) => ({ x: r.t, y: r.s }));
-      if (stateData.length > 0) {
-        stateData.push({ x: now, y: stateData[stateData.length - 1].y });
+      const tempData = alignSeriesToTimeline(tempSource, null);
+      const ambData = alignSeriesToTimeline(ambSource, null);
+      const stateData = alignSeriesToTimeline(stateSource, 0);
+
+      let offMs = 0;
+      let cooldownMs = 0;
+      let onMs = 0;
+      for (let i = 0; i + 1 < stateData.length; i += 1) {
+        const dt = stateData[i + 1].x - stateData[i].x;
+        if (dt <= 0) continue;
+        if (stateData[i].y === 0) offMs += dt;
+        else if (stateData[i].y === 1) cooldownMs += dt;
+        else if (stateData[i].y === 2) onMs += dt;
       }
+      this.histStateTotals = {
+        offMs,
+        cooldownMs,
+        onMs,
+        totalMs: offMs + cooldownMs + onMs,
+      };
+
+      const hoverGuidePlugin = {
+        id: "hoverGuide",
+        afterDraw: (chart, _args, pluginOpts) => {
+          const tooltip = chart.tooltip;
+          if (!tooltip) return;
+
+          const active = tooltip.getActiveElements();
+          if (!active || active.length === 0) return;
+
+          const x = active[0]?.element?.x;
+          if (!Number.isFinite(x)) return;
+
+          const {
+            ctx,
+            chartArea: { top, bottom },
+          } = chart;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(x, top);
+          ctx.lineTo(x, bottom);
+          ctx.lineWidth = pluginOpts?.lineWidth ?? 1;
+          ctx.strokeStyle = pluginOpts?.color ?? "rgba(100, 116, 139, 0.5)";
+          ctx.setLineDash(pluginOpts?.dash ?? [4, 4]);
+          ctx.stroke();
+          ctx.restore();
+        },
+      };
 
       let yTempMin;
       let yTempMax;
-      const allTempVals = [...tempData, ...ambData].map((p) => p.y);
+      const allTempVals = [...tempData, ...ambData].map((p) => p.y).filter((v) => Number.isFinite(v));
       if (allTempVals.length > 0) {
         const dataMin = Math.min(...allTempVals);
         const dataMax = Math.max(...allTempVals);
@@ -512,6 +602,7 @@ function neverina() {
 
       this._chart = new Chart(canvas, {
         type: "line",
+        plugins: [hoverGuidePlugin],
         data: {
           datasets: [
             {
@@ -547,7 +638,11 @@ function neverina() {
         },
         options: {
           responsive: true,
-          interaction: { mode: "index", intersect: false },
+          interaction: {
+            mode: "index",
+            axis: "x",
+            intersect: false,
+          },
           scales: {
             x: {
               type: "time",
@@ -588,14 +683,22 @@ function neverina() {
             },
           },
           plugins: {
+            hoverGuide: {
+              color: "rgba(100, 116, 139, 0.55)",
+              lineWidth: 1,
+              dash: [4, 4],
+            },
             legend: { display: true },
             tooltip: {
               callbacks: {
                 label: (ctx) => {
-                  if (ctx.dataset.yAxisID === "yState") {
-                    return "State: " + (["OFF", "CoolDown", "ON"][ctx.parsed.y] ?? "?");
+                  if (!Number.isFinite(ctx.parsed.y)) {
+                    return `${ctx.dataset.label}: —`;
                   }
-                  return ctx.parsed.y.toFixed(1) + " °C";
+                  if (ctx.dataset.yAxisID === "yState") {
+                    return `${ctx.dataset.label}: ${["OFF", "CoolDown", "ON"][ctx.parsed.y] ?? "?"}`;
+                  }
+                  return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} °C`;
                 },
               },
             },

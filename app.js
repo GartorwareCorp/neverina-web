@@ -25,6 +25,7 @@ const CHAR_UUID = {
 
 // Sentinel returned by DS18B20 when disconnected
 const SENSOR_DISCONNECTED = -127;
+const HIST_TEMP_INVALID_X10 = -32768;
 
 // Error bitmask flags (must match ERR_* constants in main.cpp)
 const ERROR_NAMES = {
@@ -113,19 +114,19 @@ function neverina() {
         const server = await this._device.gatt.connect();
         const service = await server.getPrimaryService(SVC_UUID);
 
-        for (const [key, uuid] of Object.entries(CHAR_UUID)) {
-          this._chars[key] = await service.getCharacteristic(uuid);
+        const entries = Object.entries(CHAR_UUID);
+        const charResults = await Promise.all(entries.map(([, uuid]) => service.getCharacteristic(uuid)));
+        for (let i = 0; i < entries.length; i++) {
+          this._chars[entries[i][0]] = charResults[i];
         }
 
-        await this._subscribeStatus();
-        await this._subscribeHistData();
+        await Promise.all([this._subscribeStatus(), this._subscribeHistData()]);
 
         this.connected = true;
         this.deviceName = this._device.name;
 
         await this._syncTime();
-        await this.readAll();
-        await this._readHistCounts();
+        await Promise.all([this.readAll(), this._readHistCounts()]);
       } catch (err) {
         if (err.name !== "NotFoundError") {
           alert("Connection failed: " + err.message);
@@ -154,21 +155,47 @@ function neverina() {
           return v.getUint32(0, true);
         };
 
-        this.params.tempStop = +(await rf(this._chars.TEMP_STOP)).toFixed(1);
-        this.params.tempStart = +(await rf(this._chars.TEMP_START)).toFixed(1);
-        this.params.minOff = await ru(this._chars.MIN_OFF);
-        this.params.maxRun = await ru(this._chars.MAX_RUN);
-        this.params.cooldown = await ru(this._chars.COOLDOWN);
-        this.params.tempInt = await ru(this._chars.TEMP_INT);
+        const [
+          tempStop,
+          tempStart,
+          minOff,
+          maxRun,
+          cooldown,
+          tempInt,
+          tempVal,
+          ambVal,
+          compStateDv,
+          stateTime,
+          errStatusDv,
+          uptimeDv,
+        ] = await Promise.all([
+          rf(this._chars.TEMP_STOP),
+          rf(this._chars.TEMP_START),
+          ru(this._chars.MIN_OFF),
+          ru(this._chars.MAX_RUN),
+          ru(this._chars.COOLDOWN),
+          ru(this._chars.TEMP_INT),
+          rf(this._chars.CURR_TEMP),
+          rf(this._chars.CURR_AMB),
+          this._chars.COMP_STATE.readValue(),
+          ru(this._chars.STATE_TIME),
+          this._chars.ERR_STATUS.readValue(),
+          this._chars.UPTIME.readValue(),
+        ]);
 
-        const tempVal = await rf(this._chars.CURR_TEMP);
-        this.status.temp = tempVal !== SENSOR_DISCONNECTED ? tempVal : null;
-        const ambVal = await rf(this._chars.CURR_AMB);
-        this.status.ambTemp = ambVal !== SENSOR_DISCONNECTED ? ambVal : null;
-        this.status.state = (await this._chars.COMP_STATE.readValue()).getUint8(0);
-        this.status.stateTime = await ru(this._chars.STATE_TIME);
-        this.status.errors = (await this._chars.ERR_STATUS.readValue()).getUint8(0);
-        this.status.uptime = (await this._chars.UPTIME.readValue()).getUint32(0, true);
+        this.params.tempStop = +tempStop.toFixed(1);
+        this.params.tempStart = +tempStart.toFixed(1);
+        this.params.minOff = minOff;
+        this.params.maxRun = maxRun;
+        this.params.cooldown = cooldown;
+        this.params.tempInt = tempInt;
+
+        this.status.temp = this.isValidTemp(tempVal) ? tempVal : null;
+        this.status.ambTemp = this.isValidTemp(ambVal) ? ambVal : null;
+        this.status.state = compStateDv.getUint8(0);
+        this.status.stateTime = stateTime;
+        this.status.errors = errStatusDv.getUint8(0);
+        this.status.uptime = uptimeDv.getUint32(0, true);
       } catch (err) {
         console.error("readAll failed:", err);
       }
@@ -272,6 +299,10 @@ function neverina() {
       return value.toFixed(1) + "%";
     },
 
+    isValidTemp(value) {
+      return Number.isFinite(value) && value !== SENSOR_DISCONNECTED && value !== HIST_TEMP_INVALID_X10;
+    },
+
     histStatePercent(ms) {
       const total = this.histStateTotals.totalMs;
       if (!total || total <= 0) return 0;
@@ -306,43 +337,41 @@ function neverina() {
     async _subscribeStatus() {
       const self = this;
 
-      await this._chars.CURR_TEMP.startNotifications();
       this._chars.CURR_TEMP.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         const val = e.target.value.getFloat32(0, true);
-        self.status.temp = val !== SENSOR_DISCONNECTED ? val : null;
+        self.status.temp = self.isValidTemp(val) ? val : null;
       });
-
-      await this._chars.COMP_STATE.startNotifications();
       this._chars.COMP_STATE.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 1) return;
         self.status.state = e.target.value.getUint8(0);
       });
-
-      await this._chars.STATE_TIME.startNotifications();
       this._chars.STATE_TIME.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         self.status.stateTime = e.target.value.getUint32(0, true);
       });
-
-      await this._chars.ERR_STATUS.startNotifications();
       this._chars.ERR_STATUS.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 1) return;
         self.status.errors = e.target.value.getUint8(0);
       });
-
-      await this._chars.UPTIME.startNotifications();
       this._chars.UPTIME.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         self.status.uptime = e.target.value.getUint32(0, true);
       });
-
-      await this._chars.CURR_AMB.startNotifications();
       this._chars.CURR_AMB.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         const val = e.target.value.getFloat32(0, true);
-        self.status.ambTemp = val !== SENSOR_DISCONNECTED ? val : null;
+        self.status.ambTemp = self.isValidTemp(val) ? val : null;
       });
+
+      await Promise.all([
+        this._chars.CURR_TEMP.startNotifications(),
+        this._chars.COMP_STATE.startNotifications(),
+        this._chars.STATE_TIME.startNotifications(),
+        this._chars.ERR_STATUS.startNotifications(),
+        this._chars.UPTIME.startNotifications(),
+        this._chars.CURR_AMB.startNotifications(),
+      ]);
     },
 
     async _subscribeHistData() {
@@ -361,7 +390,8 @@ function neverina() {
       for (let i = 0; i + 6 <= buf.length; i += 6) {
         const ms = dv.getUint32(i, true);
         const tempX10 = dv.getInt16(i + 4, true);
-        records.push({ t: this._millisToEpoch(ms), v: tempX10 / 10 });
+        const v = this.isValidTemp(tempX10) ? tempX10 / 10 : Number.NaN;
+        records.push({ t: this._millisToEpoch(ms), v });
       }
       console.log("[HIST] Parsed temp records:", records.length, records);
       return records;
@@ -466,7 +496,9 @@ function neverina() {
       try {
         const tempBuf = await this._requestDump(0, 0);
         const stateBuf = await this._requestDump(1, 0);
-        const ambBuf = await this._requestDump(2, 0);
+        // TODO HABILITAR CUANDO ESTE LISTO
+        // const ambBuf = await this._requestDump(2, 0);
+        const ambBuf = new Uint8Array(0);
         this.tempRecords = this._parseTempBuf(tempBuf);
         this.stateRecords = this._parseStateBuf(stateBuf);
         this.ambRecords = this._parseTempBuf(ambBuf);
@@ -502,9 +534,9 @@ function neverina() {
       const now = Date.now();
 
       // Build a common timeline and forward-fill previous values on each series.
-      // SENSOR_DISCONNECTED (-127) is mapped to null so Chart.js renders a gap in the line.
-      const tempSource = this.tempRecords.map((r) => ({ x: r.t, y: r.v === SENSOR_DISCONNECTED ? null : r.v }));
-      const ambSource = this.ambRecords.map((r) => ({ x: r.t, y: r.v === SENSOR_DISCONNECTED ? null : r.v }));
+      // Invalid values (NaN and legacy -127 sentinel) are mapped to null for chart gaps.
+      const tempSource = this.tempRecords.map((r) => ({ x: r.t, y: this.isValidTemp(r.v) ? r.v : null }));
+      const ambSource = this.ambRecords.map((r) => ({ x: r.t, y: this.isValidTemp(r.v) ? r.v : null }));
       const stateSource = this.stateRecords.map((r) => ({ x: r.t, y: r.s }));
 
       if (tempSource.length > 0) tempSource.push({ x: now, y: tempSource[tempSource.length - 1].y });

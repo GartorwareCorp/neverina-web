@@ -157,47 +157,21 @@ function neverina() {
           return v.getUint32(0, true);
         };
 
-        const [
-          tempStop,
-          tempStart,
-          minOff,
-          maxRun,
-          cooldown,
-          tempInt,
-          tempVal,
-          ambVal,
-          compStateDv,
-          stateTime,
-          errStatusDv,
-          uptimeDv,
-        ] = await Promise.all([
-          rf(this._chars.TEMP_STOP),
-          rf(this._chars.TEMP_START),
-          ru(this._chars.MIN_OFF),
-          ru(this._chars.MAX_RUN),
-          ru(this._chars.COOLDOWN),
-          ru(this._chars.TEMP_INT),
-          rf(this._chars.CURR_TEMP),
-          rf(this._chars.CURR_AMB),
-          this._chars.COMP_STATE.readValue(),
-          ru(this._chars.STATE_TIME),
-          this._chars.ERR_STATUS.readValue(),
-          this._chars.UPTIME.readValue(),
-        ]);
+        this.params.tempStop = +(await rf(this._chars.TEMP_STOP)).toFixed(1);
+        this.params.tempStart = +(await rf(this._chars.TEMP_START)).toFixed(1);
+        this.params.minOff = await ru(this._chars.MIN_OFF);
+        this.params.maxRun = await ru(this._chars.MAX_RUN);
+        this.params.cooldown = await ru(this._chars.COOLDOWN);
+        this.params.tempInt = await ru(this._chars.TEMP_INT);
 
-        this.params.tempStop = +tempStop.toFixed(1);
-        this.params.tempStart = +tempStart.toFixed(1);
-        this.params.minOff = minOff;
-        this.params.maxRun = maxRun;
-        this.params.cooldown = cooldown;
-        this.params.tempInt = tempInt;
-
+        const tempVal = await rf(this._chars.CURR_TEMP);
         this.status.temp = this.isValidTemp(tempVal) ? tempVal : null;
+        const ambVal = await rf(this._chars.CURR_AMB);
         this.status.ambTemp = this.isValidTemp(ambVal) ? ambVal : null;
-        this.status.state = compStateDv.getUint8(0);
-        this.status.stateTime = stateTime;
-        this.status.errors = errStatusDv.getUint8(0);
-        this.status.uptime = uptimeDv.getUint32(0, true);
+        this.status.state = (await this._chars.COMP_STATE.readValue()).getUint8(0);
+        this.status.stateTime = await ru(this._chars.STATE_TIME);
+        this.status.errors = (await this._chars.ERR_STATUS.readValue()).getUint8(0);
+        this.status.uptime = (await this._chars.UPTIME.readValue()).getUint32(0, true);
       } catch (err) {
         console.error("readAll failed:", err);
       }
@@ -330,42 +304,45 @@ function neverina() {
     async _subscribeCharacteristics() {
       const self = this;
 
+      await this._chars.CURR_TEMP.startNotifications();
       this._chars.CURR_TEMP.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         const val = e.target.value.getFloat32(0, true);
         self.status.temp = self.isValidTemp(val) ? val : null;
       });
+
+      await this._chars.COMP_STATE.startNotifications();
       this._chars.COMP_STATE.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 1) return;
         self.status.state = e.target.value.getUint8(0);
       });
+
+      await this._chars.STATE_TIME.startNotifications();
       this._chars.STATE_TIME.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         self.status.stateTime = e.target.value.getUint32(0, true);
       });
+
+      await this._chars.ERR_STATUS.startNotifications();
       this._chars.ERR_STATUS.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 1) return;
         self.status.errors = e.target.value.getUint8(0);
       });
+
+      await this._chars.UPTIME.startNotifications();
       this._chars.UPTIME.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         self.status.uptime = e.target.value.getUint32(0, true);
       });
+
+      await this._chars.CURR_AMB.startNotifications();
       this._chars.CURR_AMB.addEventListener("characteristicvaluechanged", (e) => {
         if (!e.target.value || e.target.value.byteLength < 4) return;
         const val = e.target.value.getFloat32(0, true);
         self.status.ambTemp = self.isValidTemp(val) ? val : null;
       });
 
-      await Promise.all([
-        this._chars.CURR_TEMP.startNotifications(),
-        this._chars.COMP_STATE.startNotifications(),
-        this._chars.STATE_TIME.startNotifications(),
-        this._chars.ERR_STATUS.startNotifications(),
-        this._chars.UPTIME.startNotifications(),
-        this._chars.CURR_AMB.startNotifications(),
-        this._chars.HIST_DATA.startNotifications(),
-      ]);
+      await this._chars.HIST_DATA.startNotifications();
     },
 
     _millisToEpoch(millis_ms) {

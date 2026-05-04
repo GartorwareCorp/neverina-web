@@ -1,5 +1,5 @@
 // Cache version — replaced by CI with $GITHUB_SHA on deploy
-const CACHE_VERSION = '4cdf00f9636d32a9160ac84a1aadbfc38dcad24e';
+const CACHE_VERSION = '759d6ce96f23599e96ba816545e921bacb2c91c4';
 const CACHE_NAME = 'neverina-' + CACHE_VERSION;
 
 // App shell files (network-first)

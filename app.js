@@ -71,7 +71,6 @@ function neverina() {
     // ── History ────────────────────────────────────────────────
     histLoading: false,
     histError: null,
-    histAvailable: false, // true once HIST_CTRL has been read
     tempRecords: [], // { t: AbsMs (Number), v: float }
     ambRecords: [], // { t: AbsMs (Number), v: float }  SHT30
     stateRecords: [], // { t: AbsMs (Number), s: 0|1|2 }
@@ -105,28 +104,31 @@ function neverina() {
         this._device.addEventListener("gattserverdisconnected", () => {
           this.connected = false;
           this.deviceName = null;
-          this.histAvailable = false;
           this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
           this.status = { temp: null, ambTemp: null, state: null, stateTime: null, errors: null, uptime: null };
           this._chars = {};
+          this.tempRecords = [];
+          this.stateRecords = [];
+          this.ambRecords = [];
+          if (this._chart) {
+            this._chart.destroy();
+            this._chart = null;
+          }
         });
 
         const server = await this._device.gatt.connect();
         const service = await server.getPrimaryService(SVC_UUID);
-
-        const entries = Object.entries(CHAR_UUID);
-        const charResults = await Promise.all(entries.map(([, uuid]) => service.getCharacteristic(uuid)));
-        for (let i = 0; i < entries.length; i++) {
-          this._chars[entries[i][0]] = charResults[i];
+        for (const [key, uuid] of Object.entries(CHAR_UUID)) {
+          this._chars[key] = await service.getCharacteristic(uuid);
         }
 
-        await Promise.all([this._subscribeStatus(), this._subscribeHistData()]);
+        await this._subscribeCharacteristics();
 
         this.connected = true;
         this.deviceName = this._device.name;
 
         await this._syncTime();
-        await Promise.all([this.readAll(), this._readHistCounts()]);
+        await this.readAll();
       } catch (err) {
         if (err.name !== "NotFoundError") {
           alert("Connection failed: " + err.message);
@@ -325,16 +327,7 @@ function neverina() {
       console.log("[TIME_SYNC] millisAnc:", this._millisAnc, "epochBaseMs:", this._epochBaseMs.toString());
     },
 
-    async _readHistCounts() {
-      const v = await this._chars.HIST_CTRL.readValue();
-      const tempCount = v.getUint32(0, true);
-      const stateCount = v.getUint32(4, true);
-      const ambCount = v.byteLength >= 12 ? v.getUint32(8, true) : 0;
-      this.histAvailable = tempCount > 0 || stateCount > 0 || ambCount > 0;
-      return { tempCount, stateCount, ambCount };
-    },
-
-    async _subscribeStatus() {
+    async _subscribeCharacteristics() {
       const self = this;
 
       this._chars.CURR_TEMP.addEventListener("characteristicvaluechanged", (e) => {
@@ -371,13 +364,8 @@ function neverina() {
         this._chars.ERR_STATUS.startNotifications(),
         this._chars.UPTIME.startNotifications(),
         this._chars.CURR_AMB.startNotifications(),
+        this._chars.HIST_DATA.startNotifications(),
       ]);
-    },
-
-    async _subscribeHistData() {
-      // Keep notifications enabled. Each request installs its own temporary
-      // listener keyed by requestId and dataset type.
-      await this._chars.HIST_DATA.startNotifications();
     },
 
     _millisToEpoch(millis_ms) {

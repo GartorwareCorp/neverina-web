@@ -90,62 +90,46 @@ function neverina() {
     // ── BLE handles (private) ──────────────────────────────────
     _device: null,
     _chars: {},
+    _disconnectHandler: null,
 
     // ── Public actions ─────────────────────────────────────────
+
+    async init() {
+      this._configureInstalledAppGuards();
+      await this.tryAutoConnect();
+    },
+
+    async tryAutoConnect() {
+      if (!navigator.bluetooth || typeof navigator.bluetooth.getDevices !== "function") return;
+      if (this.connected || this.connecting) return;
+
+      this.connecting = true;
+      try {
+        const devices = await navigator.bluetooth.getDevices();
+        const device = devices.find((d) => d?.name === "Neverina");
+        if (!device) return;
+        await this._connectToDevice(device);
+      } catch (err) {
+        console.warn("Auto-connect skipped:", err);
+      } finally {
+        this.connecting = false;
+      }
+    },
 
     async connect() {
       if (!navigator.bluetooth) {
         alert("Web Bluetooth is not supported.\nUse Chrome on Desktop or Android.");
         return;
       }
+      if (this.connected || this.connecting) return;
+
       this.connecting = true;
       try {
-        this._device = await navigator.bluetooth.requestDevice({
+        const device = await navigator.bluetooth.requestDevice({
           filters: [{ name: "Neverina" }],
           optionalServices: [SVC_UUID],
         });
-
-        this._device.addEventListener("gattserverdisconnected", () => {
-          this.connected = false;
-          this.deviceName = null;
-          this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
-          this.status = {
-            temp: null,
-            ambTemp: null,
-            humidity: null,
-            state: null,
-            stateTime: null,
-            errors: null,
-            uptime: null,
-          };
-          this._chars = {};
-          this.tempRecords = [];
-          this.stateRecords = [];
-          this.ambRecords = [];
-          this.humRecords = [];
-          if (this._chart) {
-            this._chart.destroy();
-            this._chart = null;
-          }
-        });
-
-        const server = await this._device.gatt.connect();
-        const service = await server.getPrimaryService(SVC_UUID);
-        for (const [key, uuid] of Object.entries(CHAR_UUID)) {
-          try {
-            this._chars[key] = await service.getCharacteristic(uuid);
-          } catch (err) {
-            throw new Error(`Characteristic ${key} (${uuid}) failed: ${err?.name || "Error"}: ${err?.message || err}`);
-          }
-        }
-
-        await this._subscribeCharacteristics();
-
-        this.connected = true;
-        this.deviceName = this._device.name;
-
-        await this._syncTime();
-        await this.readAll();
+        await this._connectToDevice(device);
       } catch (err) {
         if (err.name !== "NotFoundError") {
           alert("Connection failed: " + err.message);
@@ -309,6 +293,88 @@ function neverina() {
     },
 
     // ── Private ────────────────────────────────────────────────
+
+    _isInstalledPwa() {
+      return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    },
+
+    _configureInstalledAppGuards() {
+      if (!this._isInstalledPwa()) return;
+
+      document.documentElement.classList.add("pwa-installed");
+
+      document.addEventListener(
+        "contextmenu",
+        (e) => {
+          if (e.target.closest("input, textarea, select, [contenteditable='true']")) return;
+          e.preventDefault();
+        },
+        { passive: false },
+      );
+
+      document.addEventListener(
+        "selectstart",
+        (e) => {
+          if (e.target.closest("input, textarea, select, [contenteditable='true']")) return;
+          e.preventDefault();
+        },
+        { passive: false },
+      );
+    },
+
+    async _connectToDevice(device) {
+      this._device = device;
+
+      if (!this._disconnectHandler) {
+        this._disconnectHandler = () => {
+          this._resetConnectionState();
+        };
+      }
+      this._device.removeEventListener("gattserverdisconnected", this._disconnectHandler);
+      this._device.addEventListener("gattserverdisconnected", this._disconnectHandler);
+
+      const server = await this._device.gatt.connect();
+      const service = await server.getPrimaryService(SVC_UUID);
+      for (const [key, uuid] of Object.entries(CHAR_UUID)) {
+        try {
+          this._chars[key] = await service.getCharacteristic(uuid);
+        } catch (err) {
+          throw new Error(`Characteristic ${key} (${uuid}) failed: ${err?.name || "Error"}: ${err?.message || err}`);
+        }
+      }
+
+      await this._subscribeCharacteristics();
+
+      this.connected = true;
+      this.deviceName = this._device.name || "Neverina";
+
+      await this._syncTime();
+      await this.readAll();
+    },
+
+    _resetConnectionState() {
+      this.connected = false;
+      this.deviceName = null;
+      this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
+      this.status = {
+        temp: null,
+        ambTemp: null,
+        humidity: null,
+        state: null,
+        stateTime: null,
+        errors: null,
+        uptime: null,
+      };
+      this._chars = {};
+      this.tempRecords = [];
+      this.stateRecords = [];
+      this.ambRecords = [];
+      this.humRecords = [];
+      if (this._chart) {
+        this._chart.destroy();
+        this._chart = null;
+      }
+    },
 
     async _syncTime() {
       // Write Date.now() as int64 LE to TIME_SYNC

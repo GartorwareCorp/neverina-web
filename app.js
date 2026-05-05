@@ -15,6 +15,7 @@ const CHAR_UUID = {
   ERR_STATUS: "6e657665-7269-6e61-8000-000000000024",
   UPTIME: "6e657665-7269-6e61-8000-000000000025",
   CURR_AMB: "6e657665-7269-6e61-8000-000000000026",
+  CURR_HUM: "6e657665-7269-6e61-8000-000000000027",
   // History
   TIME_SYNC: "6e657665-7269-6e61-8000-000000000031",
   HIST_CTRL: "6e657665-7269-6e61-8000-000000000041",
@@ -26,6 +27,7 @@ const CHAR_UUID = {
 // Sentinel returned by DS18B20 when disconnected
 const SENSOR_DISCONNECTED = -127;
 const HIST_TEMP_INVALID_X10 = -32768;
+const HIST_HUMIDITY_INVALID = 255;
 
 // Error bitmask flags (must match ERR_* constants in main.cpp)
 const ERROR_NAMES = {
@@ -58,6 +60,7 @@ function neverina() {
     status: {
       temp: null, // float °C  (null = sensor error / disconnected)
       ambTemp: null, // float °C  SHT30 ambient (null = sensor error)
+      humidity: null, // float %RH SHT30 ambient humidity (null = sensor error)
       state: null, // 0=OFF 1=COOLDOWN 2=ON
       stateTime: null, // uint32 seconds in current state
       errors: null, // uint8 bitmask (null = unknown, 0 = OK)
@@ -73,6 +76,7 @@ function neverina() {
     histError: null,
     tempRecords: [], // { t: AbsMs (Number), v: float }
     ambRecords: [], // { t: AbsMs (Number), v: float }  SHT30
+    humRecords: [], // { t: AbsMs (Number), v: float }  SHT30 humidity
     stateRecords: [], // { t: AbsMs (Number), s: 0|1|2 }
     histStateTotals: { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 },
     _nextHistRequestId: 1,
@@ -105,11 +109,20 @@ function neverina() {
           this.connected = false;
           this.deviceName = null;
           this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
-          this.status = { temp: null, ambTemp: null, state: null, stateTime: null, errors: null, uptime: null };
+          this.status = {
+            temp: null,
+            ambTemp: null,
+            humidity: null,
+            state: null,
+            stateTime: null,
+            errors: null,
+            uptime: null,
+          };
           this._chars = {};
           this.tempRecords = [];
           this.stateRecords = [];
           this.ambRecords = [];
+          this.humRecords = [];
           if (this._chart) {
             this._chart.destroy();
             this._chart = null;
@@ -119,7 +132,11 @@ function neverina() {
         const server = await this._device.gatt.connect();
         const service = await server.getPrimaryService(SVC_UUID);
         for (const [key, uuid] of Object.entries(CHAR_UUID)) {
-          this._chars[key] = await service.getCharacteristic(uuid);
+          try {
+            this._chars[key] = await service.getCharacteristic(uuid);
+          } catch (err) {
+            throw new Error(`Characteristic ${key} (${uuid}) failed: ${err?.name || "Error"}: ${err?.message || err}`);
+          }
         }
 
         await this._subscribeCharacteristics();
@@ -168,6 +185,8 @@ function neverina() {
         this.status.temp = this.isValidTemp(tempVal) ? tempVal : null;
         const ambVal = await rf(this._chars.CURR_AMB);
         this.status.ambTemp = this.isValidTemp(ambVal) ? ambVal : null;
+        const humVal = await rf(this._chars.CURR_HUM);
+        this.status.humidity = this.isValidHumidity(humVal) ? humVal : null;
         this.status.state = (await this._chars.COMP_STATE.readValue()).getUint8(0);
         this.status.stateTime = await ru(this._chars.STATE_TIME);
         this.status.errors = (await this._chars.ERR_STATUS.readValue()).getUint8(0);
@@ -279,6 +298,10 @@ function neverina() {
       return Number.isFinite(value) && value !== SENSOR_DISCONNECTED && value !== HIST_TEMP_INVALID_X10;
     },
 
+    isValidHumidity(value) {
+      return Number.isFinite(value) && value >= 0 && value <= 100 && value !== HIST_HUMIDITY_INVALID;
+    },
+
     histStatePercent(ms) {
       const total = this.histStateTotals.totalMs;
       if (!total || total <= 0) return 0;
@@ -342,6 +365,13 @@ function neverina() {
         self.status.ambTemp = self.isValidTemp(val) ? val : null;
       });
 
+      await this._chars.CURR_HUM.startNotifications();
+      this._chars.CURR_HUM.addEventListener("characteristicvaluechanged", (e) => {
+        if (!e.target.value || e.target.value.byteLength < 4) return;
+        const val = e.target.value.getFloat32(0, true);
+        self.status.humidity = self.isValidHumidity(val) ? val : null;
+      });
+
       await this._chars.HIST_DATA.startNotifications();
     },
 
@@ -371,6 +401,19 @@ function neverina() {
         records.push({ t: this._millisToEpoch(ms), s: state });
       }
       console.log("[HIST] Parsed state records:", records.length, records);
+      return records;
+    },
+
+    _parseHumidityBuf(buf) {
+      const records = [];
+      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+      for (let i = 0; i + 5 <= buf.length; i += 5) {
+        const ms = dv.getUint32(i, true);
+        const humidity = dv.getUint8(i + 4);
+        const v = this.isValidHumidity(humidity) ? humidity : Number.NaN;
+        records.push({ t: this._millisToEpoch(ms), v });
+      }
+      console.log("[HIST] Parsed humidity records:", records.length, records);
       return records;
     },
 
@@ -461,12 +504,12 @@ function neverina() {
       try {
         const tempBuf = await this._requestDump(0, 0);
         const stateBuf = await this._requestDump(1, 0);
-        // TODO HABILITAR CUANDO ESTE LISTO
-        // const ambBuf = await this._requestDump(2, 0);
-        const ambBuf = new Uint8Array(0);
+        const ambBuf = await this._requestDump(2, 0);
+        const humBuf = await this._requestDump(3, 0);
         this.tempRecords = this._parseTempBuf(tempBuf);
         this.stateRecords = this._parseStateBuf(stateBuf);
         this.ambRecords = this._parseTempBuf(ambBuf);
+        this.humRecords = this._parseHumidityBuf(humBuf);
         this._buildChart();
       } catch (err) {
         this.histError = err.message;
@@ -502,13 +545,15 @@ function neverina() {
       // Invalid values (NaN and legacy -127 sentinel) are mapped to null for chart gaps.
       const tempSource = this.tempRecords.map((r) => ({ x: r.t, y: this.isValidTemp(r.v) ? r.v : null }));
       const ambSource = this.ambRecords.map((r) => ({ x: r.t, y: this.isValidTemp(r.v) ? r.v : null }));
+      const humSource = this.humRecords.map((r) => ({ x: r.t, y: this.isValidHumidity(r.v) ? r.v : null }));
       const stateSource = this.stateRecords.map((r) => ({ x: r.t, y: r.s }));
 
       if (tempSource.length > 0) tempSource.push({ x: now, y: tempSource[tempSource.length - 1].y });
       if (ambSource.length > 0) ambSource.push({ x: now, y: ambSource[ambSource.length - 1].y });
+      if (humSource.length > 0) humSource.push({ x: now, y: humSource[humSource.length - 1].y });
       if (stateSource.length > 0) stateSource.push({ x: now, y: stateSource[stateSource.length - 1].y });
 
-      const timeline = [...new Set([...tempSource, ...ambSource, ...stateSource].map((p) => p.x))].sort(
+      const timeline = [...new Set([...tempSource, ...ambSource, ...humSource, ...stateSource].map((p) => p.x))].sort(
         (a, b) => a - b,
       );
       if (timeline.length === 0) {
@@ -532,6 +577,7 @@ function neverina() {
 
       const tempData = alignSeriesToTimeline(tempSource, null);
       const ambData = alignSeriesToTimeline(ambSource, null);
+      const humData = alignSeriesToTimeline(humSource, null);
       const stateData = alignSeriesToTimeline(stateSource, 0);
 
       let offMs = 0;
@@ -605,8 +651,8 @@ function neverina() {
             {
               label: "Compressor",
               data: stateData,
-              borderColor: "rgba(234, 88, 12, 0.4)",
-              backgroundColor: "rgba(234, 88, 12, 0.15)",
+              borderColor: "rgba(250, 204, 21, 0.32)",
+              backgroundColor: "rgba(250, 204, 21, 0.12)",
               borderWidth: 1,
               pointRadius: 0,
               fill: true,
@@ -616,7 +662,7 @@ function neverina() {
             {
               label: "Fridge (°C)",
               data: tempData,
-              borderColor: "rgb(59, 130, 246)",
+              borderColor: "rgb(239, 68, 68)",
               borderWidth: 1.5,
               pointRadius: 0,
               fill: false,
@@ -625,11 +671,20 @@ function neverina() {
             {
               label: "Ambient (°C)",
               data: ambData,
-              borderColor: "rgb(251, 146, 60)",
+              borderColor: "rgb(249, 115, 22)",
               borderWidth: 1.5,
               pointRadius: 0,
               fill: false,
               yAxisID: "yTemp",
+            },
+            {
+              label: "Humidity (%)",
+              data: humData,
+              borderColor: "rgb(20, 184, 166)",
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: false,
+              yAxisID: "yHum",
             },
           ],
         },
@@ -671,11 +726,31 @@ function neverina() {
               position: "right",
               min: 0,
               max: 2,
-              title: { display: false, text: "State" },
+              display: true,
+              grid: {
+                drawOnChartArea: false,
+                drawTicks: false,
+              },
+              border: {
+                display: false,
+              },
               ticks: {
-                padding: 0,
+                display: false,
                 stepSize: 1,
-                callback: (val) => ["OFF", "CD", "ON"][val] ?? "",
+              },
+            },
+            yHum: {
+              type: "linear",
+              position: "right",
+              min: 0,
+              max: 100,
+              grid: {
+                drawOnChartArea: false,
+              },
+              title: { display: false, text: "%RH" },
+              ticks: {
+                stepSize: 10,
+                callback: (val) => `${val}%`,
               },
             },
           },
@@ -694,6 +769,9 @@ function neverina() {
                   }
                   if (ctx.dataset.yAxisID === "yState") {
                     return `${ctx.dataset.label}: ${["OFF", "CoolDown", "ON"][ctx.parsed.y] ?? "?"}`;
+                  }
+                  if (ctx.dataset.yAxisID === "yHum") {
+                    return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(0)} %`;
                   }
                   return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)} °C`;
                 },

@@ -63,43 +63,6 @@
     
         <!-- Status cards -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    
-          <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 items-center text-center">
-              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temperature</p>
-              <p class="text-3xl font-bold mt-1" x-text="status.temp !== null ? status.temp.toFixed(1) + ' °C' : '—'"></p>
-            </div>
-          </div>
-
-          <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 items-center text-center">
-              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Ambient temp</p>
-              <p class="text-3xl font-bold mt-1" x-text="status.ambTemp !== null ? status.ambTemp.toFixed(1) + ' °C' : '—'"></p>
-            </div>
-          </div>
-
-          <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 items-center text-center">
-              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Compressor</p>
-              <div class="mt-2">
-                <span class="badge badge-lg font-semibold" :class="stateBadgeClass()" x-text="stateLabel()"></span>
-                </div>
-                </div>
-                </div>
-
-          <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 items-center text-center">
-              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">In state</p>
-              <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.stateTime)"></p>
-            </div>
-          </div>
-
-          <div class="card bg-base-100 shadow sm:col-span-2">
-            <div class="card-body p-4 items-center text-center">
-              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Total active time</p>
-              <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.uptime)"></p>
-            </div>
-          </div>
 
           <div class="card shadow sm:col-span-2" :class="errorList().length > 0 ? 'bg-error/10' : 'bg-success/10'">
             <div class="card-body p-4 flex-row items-center gap-3">
@@ -118,7 +81,50 @@
               </div>
             </div>
           </div>
+          
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Active time</p>
+              <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.uptime)"></p>
+            </div>
+          </div>
 
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temperature</p>
+              <p class="text-3xl font-bold mt-1" x-text="status.temp !== null ? status.temp.toFixed(1) + ' °C' : '—'"></p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Ambient temp</p>
+              <p class="text-3xl font-bold mt-1" x-text="status.ambTemp !== null ? status.ambTemp.toFixed(1) + ' °C' : '—'"></p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Ambient humidity</p>
+              <p class="text-3xl font-bold mt-1" x-text="status.humidity !== null ? status.humidity.toFixed(0) + ' %' : '—'"></p>
+            </div>
+          </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Compressor</p>
+              <div class="mt-2">
+                <span class="badge badge-lg font-semibold" :class="stateBadgeClass()" x-text="stateLabel()"></span>
+              </div>
+              </div>
+              </div>
+
+          <div class="card bg-base-100 shadow">
+            <div class="card-body p-4 items-center text-center">
+              <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Duration</p>
+              <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.stateTime)"></p>
+            </div>
+          </div>
         </div>
 
         <!-- History chart -->

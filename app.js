@@ -96,7 +96,7 @@ function neverina() {
 
     async init() {
       this._configureInstalledAppGuards();
-      await this.tryAutoConnect();
+      //await this.tryAutoConnect();
     },
 
     async tryAutoConnect() {

@@ -105,12 +105,40 @@ function neverina() {
 
       this.connecting = true;
       try {
+        // Give BLE some time to stabilize advertising after boot/wake
+        await new Promise((r) => setTimeout(r, 500));
+
         const devices = await navigator.bluetooth.getDevices();
         const device = devices.find((d) => d?.name === "Neverina");
-        if (!device) return;
-        await this._connectToDevice(device);
+        if (!device) {
+          console.log("[Auto-connect] No previously granted Neverina device found");
+          return;
+        }
+
+        console.log("[Auto-connect] Found Neverina, attempting connection...");
+
+        // Retry logic for transient connection failures
+        let lastErr;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            await this._connectToDevice(device);
+            console.log("[Auto-connect] Connected successfully on attempt", attempt);
+            return;
+          } catch (err) {
+            lastErr = err;
+            const isNetworkError = err.name === "NetworkError";
+            console.warn(`[Auto-connect] Attempt ${attempt} failed:`, err.name || "Error", "—", err.message);
+
+            // Retry only on transient network errors
+            if (!isNetworkError || attempt === 3) throw err;
+
+            const backoffMs = 500 * attempt;
+            console.log(`[Auto-connect] Retrying in ${backoffMs}ms...`);
+            await new Promise((r) => setTimeout(r, backoffMs));
+          }
+        }
       } catch (err) {
-        console.warn("Auto-connect skipped:", err);
+        console.warn("[Auto-connect] Skipped:", err?.message || String(err));
       } finally {
         this.connecting = false;
       }

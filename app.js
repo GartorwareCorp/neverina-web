@@ -79,6 +79,15 @@ function neverina() {
     humRecords: [], // { t: AbsMs (Number), v: float }  SHT30 humidity
     stateRecords: [], // { t: AbsMs (Number), s: 0|1|2 }
     histStateTotals: { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 },
+    histRangeOptions: [
+      { label: "1h", ms: 1 * 60 * 60 * 1000 },
+      { label: "2h", ms: 2 * 60 * 60 * 1000 },
+      { label: "4h", ms: 4 * 60 * 60 * 1000 },
+      { label: "12h", ms: 12 * 60 * 60 * 1000 },
+      { label: "24h", ms: 24 * 60 * 60 * 1000 },
+      { label: "Completo", ms: null },
+    ],
+    selectedHistRangeMs: 2 * 60 * 60 * 1000,
     _nextHistRequestId: 1,
     _chart: null,
 
@@ -318,6 +327,12 @@ function neverina() {
       const total = this.histStateTotals.totalMs;
       if (!total || total <= 0) return 0;
       return (ms * 100) / total;
+    },
+
+    setHistoryRange(ms) {
+      console.log("Selected history range (ms):", ms);
+      this.selectedHistRangeMs = ms;
+      this._buildChart();
     },
 
     // ── Private ────────────────────────────────────────────────
@@ -614,9 +629,14 @@ function neverina() {
     },
 
     _buildChart() {
-      let canvas = document.getElementById("histChart");
-      if (!canvas) return;
+      console.log("[CHART] Building chart with records:", {
+        temp: this.tempRecords.length,
+        state: this.stateRecords.length,
+        amb: this.ambRecords.length,
+        hum: this.humRecords.length,
+      });
 
+      console.log("[CHART] Destroying previous chart instance (if any)");
       if (this._chart) {
         this._chart.destroy();
         this._chart = null;
@@ -625,6 +645,9 @@ function neverina() {
       // Replace the canvas node so Chart.js always gets a fresh 2D context.
       // Reusing the same canvas after destroy() can leave the context in a bad
       // state and cause the chart to silently not render on subsequent loads.
+      console.log("[CHART] Resetting canvas element for Chart.js");
+      let canvas = document.getElementById("histChart");
+      if (!canvas) return;
       const parent = canvas.parentNode;
       const fresh = document.createElement("canvas");
       fresh.id = canvas.id;
@@ -637,6 +660,7 @@ function neverina() {
 
       // Build a common timeline and forward-fill previous values on each series.
       // Invalid values (NaN and legacy -127 sentinel) are mapped to null for chart gaps.
+      console.log("[CHART] Building data sources for each series with forward-filled values and nulls for invalids");
       const tempSource = this.tempRecords.map((r) => ({ x: r.t, y: this.isValidTemp(r.v) ? r.v : null }));
       const ambSource = this.ambRecords.map((r) => ({ x: r.t, y: this.isValidTemp(r.v) ? r.v : null }));
       const humSource = this.humRecords.map((r) => ({ x: r.t, y: this.isValidHumidity(r.v) ? r.v : null }));
@@ -720,22 +744,71 @@ function neverina() {
         },
       };
 
+      // X - axis
+      let xMin;
+      let xMax;
+      const allTempTimes = [...tempData, ...ambData].map((p) => p.x).filter((v) => Number.isFinite(v));
+
+      if (allTempTimes.length === 0) {
+        xMin = undefined;
+        xMax = undefined;
+        return;
+      }
+
+      xMax = Math.max(...allTempTimes);
+      xMin = Math.max(Math.min(...allTempTimes), xMax - (this.selectedHistRangeMs || xMax));
+      
+      console.log("[CHART] x-axis range:", {
+        dataMin: xMin ? new Date(xMin).toISOString() : "undefined",
+        dataMax: xMax ? new Date(xMax).toISOString() : "undefined",
+        rangeMs: xMax - xMin,
+      });
+
+      // Y - axis
       let yTempMin;
       let yTempMax;
-      const allTempVals = [...tempData, ...ambData].map((p) => p.y).filter((v) => Number.isFinite(v));
+      const allTempVals = [...tempData, ...ambData]
+        .filter((p) => p.x >= xMin && p.x <= xMax)
+        .map((p) => p.y)
+        .filter((v) => Number.isFinite(v));
       if (allTempVals.length > 0) {
-        const dataMin = Math.min(...allTempVals);
-        const dataMax = Math.max(...allTempVals);
-        const span = dataMax - dataMin;
+        const dataMinY = Math.min(...allTempVals);
+        const dataMaxY = Math.max(...allTempVals);
+        const span = dataMaxY - dataMinY;
         if (span < 5) {
-          const center = (dataMin + dataMax) / 2;
+          const center = (dataMinY + dataMaxY) / 2;
           yTempMin = center - 2.5;
           yTempMax = center + 2.5;
         } else {
-          yTempMin = dataMin;
-          yTempMax = dataMax;
+          yTempMin = dataMinY;
+          yTempMax = dataMaxY;
         }
       }
+
+      let yHumMin;
+      let yHumMax;
+      const allHumVals = humData
+        .filter((p) => p.x >= xMin && p.x <= xMax)
+        .map((p) => p.y)
+        .filter((v) => Number.isFinite(v));
+      if (allHumVals.length > 0) {
+        const dataMinY = Math.min(...allHumVals);
+        const dataMaxY = Math.max(...allHumVals);
+        const span = dataMaxY - dataMinY;
+        if (span < 20) {
+          const center = (dataMinY + dataMaxY) / 2;
+          yHumMin = Math.max(0, center - 10);
+          yHumMax = Math.min(100, center + 10);
+        } else {
+          yHumMin = dataMinY;
+          yHumMax = dataMaxY;
+        }
+      }
+
+      console.log("[CHART] y-axis range:", {
+        dataMin: yTempMin,
+        dataMax: yTempMax,
+      });
 
       this._chart = new Chart(canvas, {
         type: "line",
@@ -784,6 +857,8 @@ function neverina() {
         },
         options: {
           responsive: true,
+          animation: true,
+          parsing: false,
           interaction: {
             mode: "index",
             axis: "x",
@@ -792,7 +867,8 @@ function neverina() {
           scales: {
             x: {
               type: "time",
-              max: now,
+              min: xMin,
+              max: xMax,
               time: {
                 tooltipFormat: "HH:mm:ss",
                 displayFormats: {
@@ -836,8 +912,8 @@ function neverina() {
             yHum: {
               type: "linear",
               position: "right",
-              min: 0,
-              max: 100,
+              min: yHumMin,
+              max: yHumMax,
               grid: {
                 drawOnChartArea: false,
               },
@@ -849,6 +925,12 @@ function neverina() {
             },
           },
           plugins: {
+            decimation: {
+              enabled: true,
+              algorithm: "lttb",
+              samples: 400,
+              threshold: 800,
+            },
             hoverGuide: {
               color: "rgba(100, 116, 139, 0.55)",
               lineWidth: 1,

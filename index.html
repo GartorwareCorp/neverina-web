@@ -154,10 +154,18 @@
           <div class="card-body space-y-3">
             <div class="flex items-center justify-between">
               <h2 class="card-title text-base">History</h2>
-              <button class="btn btn-sm btn-primary" @click="loadHistory()" :disabled="histLoading">
-                <span x-show="histLoading" class="loading loading-spinner loading-xs"></span>
-                <span x-text="histLoading ? 'Loading…' : 'Load'"></span>
-              </button>
+              <div class="flex items-center gap-2">
+                <select class="select select-bordered select-sm" x-model.number="selectedHistRangeMs"
+                  @change="setHistoryRange(selectedHistRangeMs)">
+                  <template x-for="opt in histRangeOptions" :key="opt.label">
+                    <option :value="opt.ms" x-text="opt.label" :selected="opt.ms === selectedHistRangeMs"></option>
+                  </template>
+                </select>
+                <button class="btn btn-sm btn-primary" @click="loadHistory()" :disabled="histLoading">
+                  <span x-show="histLoading" class="loading loading-spinner loading-xs"></span>
+                  <span x-text="histLoading ? 'Loading…' : 'Load'"></span>
+                </button>
+              </div>
             </div>
             <p x-show="histError" class="text-xs text-error" x-text="histError"></p>
             <canvas id="histChart" height="200"></canvas>

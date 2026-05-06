@@ -85,9 +85,10 @@ function neverina() {
       { label: "4h", ms: 4 * 60 * 60 * 1000 },
       { label: "12h", ms: 12 * 60 * 60 * 1000 },
       { label: "24h", ms: 24 * 60 * 60 * 1000 },
-      { label: "Completo", ms: null },
+      { label: "Completo", ms: 0 },
     ],
     selectedHistRangeMs: 2 * 60 * 60 * 1000,
+    prevHistRangeMs: -1,
     _nextHistRequestId: 1,
     _chart: null,
 
@@ -329,10 +330,20 @@ function neverina() {
       return (ms * 100) / total;
     },
 
-    setHistoryRange(ms) {
-      console.log("Selected history range (ms):", ms);
-      this.selectedHistRangeMs = ms;
-      this._buildChart();
+    setHistoryRange() {
+      console.log("Selected history range (ms):", this.selectedHistRangeMs, this.prevHistRangeMs);
+
+      // Zero means max range
+      const prevRange = this.prevHistRangeMs === 0 ? Number.MAX_SAFE_INTEGER : this.prevHistRangeMs;
+      const newRange = this.selectedHistRangeMs === 0 ? Number.MAX_SAFE_INTEGER : this.selectedHistRangeMs;
+
+      if (newRange > prevRange) {
+        // If expanding range, load more data.
+        this.loadHistory();
+      } else {
+        // If shrinking range, just trim existing data without reloading (for snappier UI).
+        this._buildChart();
+      }
     },
 
     // ── Private ────────────────────────────────────────────────
@@ -526,6 +537,50 @@ function neverina() {
       return records;
     },
 
+    async _readHistoryCounts() {
+      const v = await this._chars.HIST_CTRL.readValue();
+      if (!v || v.byteLength < 8) {
+        throw new Error("Invalid HIST_CTRL read response");
+      }
+
+      const counts = {
+        temp: v.getUint32(0, true),
+        state: v.getUint32(4, true),
+        ambient: 0,
+        humidity: 0,
+      };
+
+      // Backward-compatible parsing:
+      // - old firmware: 8 bytes  => temp + state only
+      // - new firmware: 16 bytes => temp + state + ambient + humidity
+      if (v.byteLength >= 16) {
+        counts.ambient = v.getUint32(8, true);
+        counts.humidity = v.getUint32(12, true);
+      } else {
+        counts.ambient = counts.temp;
+        counts.humidity = counts.temp;
+      }
+
+      return counts;
+    },
+
+    _computeHistoryTargetCount() {
+      const rangeMs = Number(this.selectedHistRangeMs) || 0;
+      if (rangeMs <= 0) return Number.MAX_SAFE_INTEGER;
+
+      const intervalSec = Number(this.params.tempInt) || 10;
+      const intervalMs = Math.max(1000, Math.round(intervalSec * 1000));
+      // +2 keeps the window edges visible after timeline alignment.
+      return Math.ceil(rangeMs / intervalMs) + 2;
+    },
+
+    _computeSkipOldest(totalCount, targetCount) {
+      if (!Number.isFinite(totalCount) || totalCount <= 0) return 0;
+      if (!Number.isFinite(targetCount) || targetCount <= 0) return 0;
+      if (targetCount >= Number.MAX_SAFE_INTEGER) return 0;
+      return Math.max(0, totalCount - targetCount);
+    },
+
     // Requests a dump and resolves with the raw accumulated Uint8Array.
     _requestDump(type, skipOldest) {
       return new Promise((resolve, reject) => {
@@ -611,15 +666,38 @@ function neverina() {
       this.histLoading = true;
       this.histError = null;
       try {
-        const tempBuf = await this._requestDump(0, 0);
-        const stateBuf = await this._requestDump(1, 0);
-        const ambBuf = await this._requestDump(2, 0);
-        const humBuf = await this._requestDump(3, 0);
+        const counts = await this._readHistoryCounts();
+        const targetCount = this._computeHistoryTargetCount();
+
+        const tempSkip = this._computeSkipOldest(counts.temp, targetCount);
+        const stateSkip = this._computeSkipOldest(counts.state, targetCount);
+        const ambSkip = this._computeSkipOldest(counts.ambient, targetCount);
+        const humSkip = this._computeSkipOldest(counts.humidity, targetCount);
+
+        console.log("[HIST] load range/counts:", {
+          selectedHistRangeMs: this.selectedHistRangeMs,
+          targetCount,
+          counts,
+          skip: {
+            temp: tempSkip,
+            state: stateSkip,
+            ambient: ambSkip,
+            humidity: humSkip,
+          },
+        });
+
+        const tempBuf = await this._requestDump(0, tempSkip);
+        const stateBuf = await this._requestDump(1, stateSkip);
+        const ambBuf = await this._requestDump(2, ambSkip);
+        const humBuf = await this._requestDump(3, humSkip);
         this.tempRecords = this._parseTempBuf(tempBuf);
         this.stateRecords = this._parseStateBuf(stateBuf);
         this.ambRecords = this._parseTempBuf(ambBuf);
         this.humRecords = this._parseHumidityBuf(humBuf);
         this._buildChart();
+
+        // Update prevHistRangeMs after successful load.
+        this.prevHistRangeMs = this.selectedHistRangeMs;
       } catch (err) {
         this.histError = err.message;
         console.error("[HIST] Load failed:", err);
@@ -757,7 +835,7 @@ function neverina() {
 
       xMax = Math.max(...allTempTimes);
       xMin = Math.max(Math.min(...allTempTimes), xMax - (this.selectedHistRangeMs || xMax));
-      
+
       console.log("[CHART] x-axis range:", {
         dataMin: xMin ? new Date(xMin).toISOString() : "undefined",
         dataMax: xMax ? new Date(xMax).toISOString() : "undefined",
@@ -795,10 +873,10 @@ function neverina() {
         const dataMinY = Math.min(...allHumVals);
         const dataMaxY = Math.max(...allHumVals);
         const span = dataMaxY - dataMinY;
-        if (span < 20) {
+        if (span < 10) {
           const center = (dataMinY + dataMaxY) / 2;
-          yHumMin = Math.max(0, center - 10);
-          yHumMax = Math.min(100, center + 10);
+          yHumMin = Math.max(0, center - 5);
+          yHumMax = Math.min(100, center + 5);
         } else {
           yHumMin = dataMinY;
           yHumMax = dataMaxY;

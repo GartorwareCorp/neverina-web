@@ -156,7 +156,7 @@
               <h2 class="card-title text-base">History</h2>
               <div class="flex items-center gap-2">
                 <select class="select select-bordered select-sm" x-model.number="selectedHistRangeMs"
-                  @change="setHistoryRange(selectedHistRangeMs)">
+                  @change="setHistoryRange()">
                   <template x-for="opt in histRangeOptions" :key="opt.label">
                     <option :value="opt.ms" x-text="opt.label" :selected="opt.ms === selectedHistRangeMs"></option>
                   </template>

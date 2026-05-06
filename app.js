@@ -80,6 +80,9 @@ function neverina() {
     stateRecords: [], // { t: AbsMs (Number), s: 0|1|2 }
     histStateTotals: { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 },
     histRangeOptions: [
+      { label: "5min", ms: 5 * 60 * 1000 },
+      { label: "15min", ms: 15 * 60 * 1000 },
+      { label: "30min", ms: 30 * 60 * 1000 },
       { label: "1h", ms: 1 * 60 * 60 * 1000 },
       { label: "2h", ms: 2 * 60 * 60 * 1000 },
       { label: "4h", ms: 4 * 60 * 60 * 1000 },
@@ -537,48 +540,19 @@ function neverina() {
       return records;
     },
 
-    async _readHistoryCounts() {
-      const v = await this._chars.HIST_CTRL.readValue();
-      if (!v || v.byteLength < 8) {
-        throw new Error("Invalid HIST_CTRL read response");
-      }
-
-      const counts = {
-        temp: v.getUint32(0, true),
-        state: v.getUint32(4, true),
-        ambient: 0,
-        humidity: 0,
-      };
-
-      // Backward-compatible parsing:
-      // - old firmware: 8 bytes  => temp + state only
-      // - new firmware: 16 bytes => temp + state + ambient + humidity
-      if (v.byteLength >= 16) {
-        counts.ambient = v.getUint32(8, true);
-        counts.humidity = v.getUint32(12, true);
-      } else {
-        counts.ambient = counts.temp;
-        counts.humidity = counts.temp;
-      }
-
-      return counts;
+    // Convert a Unix epoch ms timestamp to device millis using the time sync anchor.
+    // Returns 0 (= send all) if the anchor has not been set yet.
+    _epochToDeviceMillis(epochMs) {
+      if (!this._millisAnc && this._epochBaseMs === 0n) return 0;
+      const deviceMs = this._millisAnc + Number(BigInt(Math.round(epochMs)) - this._epochBaseMs);
+      return Math.max(0, Math.min(deviceMs, 0xffffffff));
     },
 
-    _computeHistoryTargetCount() {
-      const rangeMs = Number(this.selectedHistRangeMs) || 0;
-      if (rangeMs <= 0) return Number.MAX_SAFE_INTEGER;
-
-      const intervalSec = Number(this.params.tempInt) || 10;
-      const intervalMs = Math.max(1000, Math.round(intervalSec * 1000));
-      // +2 keeps the window edges visible after timeline alignment.
-      return Math.ceil(rangeMs / intervalMs) + 2;
-    },
-
-    _computeSkipOldest(totalCount, targetCount) {
-      if (!Number.isFinite(totalCount) || totalCount <= 0) return 0;
-      if (!Number.isFinite(targetCount) || targetCount <= 0) return 0;
-      if (targetCount >= Number.MAX_SAFE_INTEGER) return 0;
-      return Math.max(0, totalCount - targetCount);
+    // Compute the device-millis cutoff for the current selected range.
+    // Returns 0 when "Completo" is selected (send everything).
+    _histMillisCutoff() {
+      if (this.selectedHistRangeMs <= 0) return 0;
+      return this._epochToDeviceMillis(Date.now() - this.selectedHistRangeMs);
     },
 
     // Requests a dump and resolves with the raw accumulated Uint8Array.
@@ -666,30 +640,17 @@ function neverina() {
       this.histLoading = true;
       this.histError = null;
       try {
-        const counts = await this._readHistoryCounts();
-        const targetCount = this._computeHistoryTargetCount();
+        const cutoff = this._histMillisCutoff();
 
-        const tempSkip = this._computeSkipOldest(counts.temp, targetCount);
-        const stateSkip = this._computeSkipOldest(counts.state, targetCount);
-        const ambSkip = this._computeSkipOldest(counts.ambient, targetCount);
-        const humSkip = this._computeSkipOldest(counts.humidity, targetCount);
-
-        console.log("[HIST] load range/counts:", {
+        console.log("[HIST] load range:", {
           selectedHistRangeMs: this.selectedHistRangeMs,
-          targetCount,
-          counts,
-          skip: {
-            temp: tempSkip,
-            state: stateSkip,
-            ambient: ambSkip,
-            humidity: humSkip,
-          },
+          millisCutoff: cutoff,
         });
 
-        const tempBuf = await this._requestDump(0, tempSkip);
-        const stateBuf = await this._requestDump(1, stateSkip);
-        const ambBuf = await this._requestDump(2, ambSkip);
-        const humBuf = await this._requestDump(3, humSkip);
+        const tempBuf = await this._requestDump(0, cutoff);
+        const stateBuf = await this._requestDump(1, cutoff);
+        const ambBuf = await this._requestDump(2, cutoff);
+        const humBuf = await this._requestDump(3, cutoff);
         this.tempRecords = this._parseTempBuf(tempBuf);
         this.stateRecords = this._parseStateBuf(stateBuf);
         this.ambRecords = this._parseTempBuf(ambBuf);

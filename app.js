@@ -737,22 +737,6 @@ function neverina() {
       const humData = alignSeriesToTimeline(humSource, null);
       const stateData = alignSeriesToTimeline(stateSource, 0);
 
-      let offMs = 0;
-      let cooldownMs = 0;
-      let onMs = 0;
-      for (let i = 0; i + 1 < stateData.length; i += 1) {
-        const dt = stateData[i + 1].x - stateData[i].x;
-        if (dt <= 0) continue;
-        if (stateData[i].y === 0) offMs += dt;
-        else if (stateData[i].y === 1) cooldownMs += dt;
-        else if (stateData[i].y === 2) onMs += dt;
-      }
-      this.histStateTotals = {
-        offMs,
-        cooldownMs,
-        onMs,
-        totalMs: offMs + cooldownMs + onMs,
-      };
 
       const hoverGuidePlugin = {
         id: "hoverGuide",
@@ -802,6 +786,23 @@ function neverina() {
         dataMax: xMax ? new Date(xMax).toISOString() : "undefined",
         rangeMs: xMax - xMin,
       });
+
+      // State totals clipped to the visible window [xMin, xMax]
+      {
+        let offMs = 0;
+        let cooldownMs = 0;
+        let onMs = 0;
+        for (let i = 0; i + 1 < stateData.length; i += 1) {
+          const segStart = Math.max(stateData[i].x, xMin);
+          const segEnd = Math.min(stateData[i + 1].x, xMax);
+          const dt = segEnd - segStart;
+          if (dt <= 0) continue;
+          if (stateData[i].y === 0) offMs += dt;
+          else if (stateData[i].y === 1) cooldownMs += dt;
+          else if (stateData[i].y === 2) onMs += dt;
+        }
+        this.histStateTotals = { offMs, cooldownMs, onMs, totalMs: offMs + cooldownMs + onMs };
+      }
 
       // Y - axis
       let yTempMin;

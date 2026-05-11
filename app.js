@@ -79,6 +79,8 @@ function neverina() {
     humRecords: [], // { t: AbsMs (Number), v: float }  SHT30 humidity
     stateRecords: [], // { t: AbsMs (Number), s: 0|1|2 }
     histStateTotals: { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 },
+    histTempStats: { min: null, avg: null, max: null },
+    histAmbStats: { min: null, avg: null, max: null },
     histRangeOptions: [
       { label: "5min", ms: 5 * 60 * 1000 },
       { label: "15min", ms: 15 * 60 * 1000 },
@@ -307,11 +309,18 @@ function neverina() {
         const s = secs % 60;
         return s > 0 ? `${m}m ${s}s` : `${m}m`;
       }
-      const h = Math.floor(secs / 3600);
+      if (secs < 86400) {
+        const h = Math.floor(secs / 3600);
+        const m = Math.floor((secs % 3600) / 60);
+        const s = secs % 60;
+        if (s > 0) return `${h}h ${m}m ${s}s`;
+        return m > 0 ? `${h}h ${m}m` : `${h}h`;
+      }
+      const d = Math.floor(secs / 86400);
+      const h = Math.floor((secs % 86400) / 3600);
       const m = Math.floor((secs % 3600) / 60);
-      const s = secs % 60;
-      if (s > 0) return `${h}h ${m}m ${s}s`;
-      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+      if (h > 0) return `${d}d ${h}h ${m}m`;
+      return m > 0 ? `${d}d ${m}m` : `${d}d`;
     },
 
     formatPercent(value) {
@@ -413,6 +422,8 @@ function neverina() {
       this.connected = false;
       this.deviceName = null;
       this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
+      this.histTempStats = { min: null, avg: null, max: null };
+      this.histAmbStats = { min: null, avg: null, max: null };
       this.status = {
         temp: null,
         ambTemp: null,
@@ -715,6 +726,8 @@ function neverina() {
       );
       if (timeline.length === 0) {
         this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
+        this.histTempStats = { min: null, avg: null, max: null };
+        this.histAmbStats = { min: null, avg: null, max: null };
         return;
       }
 
@@ -736,7 +749,6 @@ function neverina() {
       const ambData = alignSeriesToTimeline(ambSource, null);
       const humData = alignSeriesToTimeline(humSource, null);
       const stateData = alignSeriesToTimeline(stateSource, 0);
-
 
       const hoverGuidePlugin = {
         id: "hoverGuide",
@@ -803,6 +815,28 @@ function neverina() {
         }
         this.histStateTotals = { offMs, cooldownMs, onMs, totalMs: offMs + cooldownMs + onMs };
       }
+
+      // Temperature stats for visible window (time-weighted average)
+      const _computeStats = (data) => {
+        const visible = data.filter((p) => p.x >= xMin && p.x <= xMax && Number.isFinite(p.y));
+        if (visible.length === 0) return { min: null, avg: null, max: null };
+        let min = Infinity;
+        let max = -Infinity;
+        let weightedSum = 0;
+        let totalDt = 0;
+        for (let i = 0; i < visible.length; i++) {
+          const y = visible[i].y;
+          if (y < min) min = y;
+          if (y > max) max = y;
+          const dt = i + 1 < visible.length ? visible[i + 1].x - visible[i].x : 0;
+          weightedSum += y * dt;
+          totalDt += dt;
+        }
+        const avg = totalDt > 0 ? weightedSum / totalDt : visible[0].y;
+        return { min, avg, max };
+      };
+      this.histTempStats = _computeStats(tempData);
+      this.histAmbStats = _computeStats(ambData);
 
       // Y - axis
       let yTempMin;

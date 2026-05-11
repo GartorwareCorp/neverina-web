@@ -187,6 +187,42 @@
                 <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
               </div>
             </div>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-2" x-show="histTempStats.min !== null || histAmbStats.min !== null">
+  <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histTempStats.min !== null">
+    <p class="text-xs text-base-content/60 uppercase tracking-wide">Fridge temp</p>
+    <div class="flex justify-between mt-1">
+      <div class="text-center">
+        <p class="text-[10px] text-base-content/40 uppercase">Min</p>
+        <p class="text-sm font-semibold" x-text="histTempStats.min?.toFixed(1) + ' °C'"></p>
+      </div>
+      <div class="text-center">
+        <p class="text-[10px] text-base-content/40 uppercase">Avg</p>
+        <p class="text-sm font-semibold" x-text="histTempStats.avg?.toFixed(1) + ' °C'"></p>
+      </div>
+      <div class="text-center">
+        <p class="text-[10px] text-base-content/40 uppercase">Max</p>
+        <p class="text-sm font-semibold" x-text="histTempStats.max?.toFixed(1) + ' °C'"></p>
+      </div>
+    </div>
+  </div>
+  <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histAmbStats.min !== null">
+    <p class="text-xs text-base-content/60 uppercase tracking-wide">Ambient temp</p>
+    <div class="flex justify-between mt-1">
+      <div class="text-center">
+        <p class="text-[10px] text-base-content/40 uppercase">Min</p>
+        <p class="text-sm font-semibold" x-text="histAmbStats.min?.toFixed(1) + ' °C'"></p>
+      </div>
+      <div class="text-center">
+        <p class="text-[10px] text-base-content/40 uppercase">Avg</p>
+        <p class="text-sm font-semibold" x-text="histAmbStats.avg?.toFixed(1) + ' °C'"></p>
+      </div>
+      <div class="text-center">
+        <p class="text-[10px] text-base-content/40 uppercase">Max</p>
+        <p class="text-sm font-semibold" x-text="histAmbStats.max?.toFixed(1) + ' °C'"></p>
+      </div>
+    </div>
+  </div>
+</div>
             </div>
             </div>
 

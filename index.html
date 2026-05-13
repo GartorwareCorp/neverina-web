@@ -224,6 +224,57 @@
     </div>
   </div>
 </div>
+
+            <!-- ── Compressor cycle stats ──────────────────────────────── -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2"
+              x-show="histCycleStats.count !== null && histCycleStats.count > 0">
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Cycles</p>
+                <p class="text-sm font-semibold" x-text="histCycleStats.count"></p>
+                <p class="text-xs text-base-content/60"
+                  x-text="histCycleStats.startsPerHour !== null ? histCycleStats.startsPerHour.toFixed(1) + ' /h' : '—'"></p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg ON</p>
+                <p class="text-sm font-semibold"
+                  x-text="histCycleStats.avgOnSec !== null ? formatDuration(Math.round(histCycleStats.avgOnSec)) : '—'"></p>
+                <p class="text-xs text-base-content/60">per cycle</p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg OFF</p>
+                <p class="text-sm font-semibold"
+                  x-text="histCycleStats.avgOffSec !== null ? formatDuration(Math.round(histCycleStats.avgOffSec)) : '—'"></p>
+                <p class="text-xs text-base-content/60">between cycles</p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Duty cycle</p>
+                <p class="text-sm font-semibold" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
+                <p class="text-xs text-base-content/60">compressor ON</p>
+              </div>
+            </div>
+
+            <!-- ── Thermal performance stats ───────────────────────────── -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2"
+              x-show="histThermalStats.coolingRateCPerMin !== null || histThermalStats.heatLeakRateCPerMin !== null || histThermalStats.avgDeltaT !== null">
+              <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.coolingRateCPerMin !== null">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Cooling rate</p>
+                <p class="text-sm font-semibold"
+                  x-text="(histThermalStats.coolingRateCPerMin >= 0 ? '+' : '') + histThermalStats.coolingRateCPerMin.toFixed(2) + ' °C/min'"></p>
+                <p class="text-xs text-base-content/60">while compressor ON</p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.heatLeakRateCPerMin !== null">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Heat leak</p>
+                <p class="text-sm font-semibold"
+                  x-text="(histThermalStats.heatLeakRateCPerMin >= 0 ? '+' : '') + histThermalStats.heatLeakRateCPerMin.toFixed(2) + ' °C/min'"></p>
+                <p class="text-xs text-base-content/60">while compressor OFF</p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.avgDeltaT !== null">
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg ΔT</p>
+                <p class="text-sm font-semibold"
+                  x-text="(histThermalStats.avgDeltaT >= 0 ? '+' : '') + histThermalStats.avgDeltaT.toFixed(1) + ' °C'"></p>
+                <p class="text-xs text-base-content/60">fridge − door</p>
+              </div>
+            </div>
             </div>
             </div>
 

@@ -86,6 +86,8 @@ function neverina() {
     histStateTotals: { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 },
     histTempStats: { min: null, avg: null, max: null },
     histAmbStats: { min: null, avg: null, max: null },
+    histCycleStats: { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null },
+    histThermalStats: { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null },
     histRangeOptions: [
       { label: "5min", ms: 5 * 60 * 1000 },
       { label: "15min", ms: 15 * 60 * 1000 },
@@ -93,6 +95,7 @@ function neverina() {
       { label: "1h", ms: 1 * 60 * 60 * 1000 },
       { label: "2h", ms: 2 * 60 * 60 * 1000 },
       { label: "4h", ms: 4 * 60 * 60 * 1000 },
+      { label: "8h", ms: 8 * 60 * 60 * 1000 },
       { label: "12h", ms: 12 * 60 * 60 * 1000 },
       { label: "24h", ms: 24 * 60 * 60 * 1000 },
       { label: "Completo", ms: 0 },
@@ -465,6 +468,8 @@ function neverina() {
       this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
       this.histTempStats = { min: null, avg: null, max: null };
       this.histAmbStats = { min: null, avg: null, max: null };
+      this.histCycleStats = { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null };
+      this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null };
       this.status = {
         temp: null,
         ambTemp: null,
@@ -730,6 +735,8 @@ function neverina() {
         this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
         this.histTempStats = { min: null, avg: null, max: null };
         this.histAmbStats = { min: null, avg: null, max: null };
+        this.histCycleStats = { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null };
+        this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null };
         return;
       }
 
@@ -789,6 +796,8 @@ function neverina() {
       if (allTempTimes.length === 0) {
         xMin = undefined;
         xMax = undefined;
+        this.histCycleStats = { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null };
+        this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null };
         return;
       }
 
@@ -839,6 +848,94 @@ function neverina() {
       };
       this.histTempStats = _computeStats(tempData);
       this.histAmbStats = _computeStats(ambData);
+
+      // ── Compressor cycle & thermal performance stats ────────────────
+      {
+        const onSegs = [];
+        const nonOnSegs = [];
+        let curOnStart = null;
+        let curNonOnStart = null;
+        let lastOnEnd = null;
+        const cycleOnMs = [];
+        const interCycleOffMs = [];
+
+        for (let i = 0; i + 1 < stateData.length; i++) {
+          const clampedStart = Math.max(stateData[i].x, xMin);
+          const clampedEnd = Math.min(stateData[i + 1].x, xMax);
+          if (clampedEnd <= clampedStart) continue;
+          const state = stateData[i].y;
+
+          if (state === 2) {
+            // Entering ON
+            if (curNonOnStart !== null) {
+              nonOnSegs.push({ start: curNonOnStart, end: clampedStart });
+              curNonOnStart = null;
+            }
+            if (curOnStart === null) {
+              curOnStart = clampedStart;
+              if (lastOnEnd !== null) interCycleOffMs.push(clampedStart - lastOnEnd);
+            }
+          } else {
+            // Leaving ON (or never was ON)
+            if (curOnStart !== null) {
+              cycleOnMs.push(clampedStart - curOnStart);
+              onSegs.push({ start: curOnStart, end: clampedStart });
+              lastOnEnd = clampedStart;
+              curOnStart = null;
+            }
+            if (curNonOnStart === null) curNonOnStart = clampedStart;
+          }
+        }
+        // Close open segments at window edge
+        if (curOnStart !== null) {
+          cycleOnMs.push(xMax - curOnStart);
+          onSegs.push({ start: curOnStart, end: xMax });
+        }
+        if (curNonOnStart !== null) nonOnSegs.push({ start: curNonOnStart, end: xMax });
+
+        const cycleCount = cycleOnMs.length;
+        const avgOnSec =
+          cycleCount > 0 ? cycleOnMs.reduce((a, b) => a + b, 0) / cycleCount / 1000 : null;
+        const avgOffSec =
+          interCycleOffMs.length > 0
+            ? interCycleOffMs.reduce((a, b) => a + b, 0) / interCycleOffMs.length / 1000
+            : null;
+        const windowMs = xMax - xMin;
+        const startsPerHour = windowMs > 0 ? cycleCount / (windowMs / 3600000) : null;
+
+        // Time-weighted mean slope (°C/min) across a list of {start, end} segments
+        const _segSlope = (segs) => {
+          let wSum = 0;
+          let wTot = 0;
+          for (const seg of segs) {
+            const pts = tempData.filter((p) => p.x >= seg.start && p.x <= seg.end && p.y !== null);
+            if (pts.length < 2) continue;
+            const dtMs = pts[pts.length - 1].x - pts[0].x;
+            const dT = pts[pts.length - 1].y - pts[0].y;
+            if (dtMs <= 0) continue;
+            wSum += (dT / (dtMs / 60000)) * dtMs;
+            wTot += dtMs;
+          }
+          return wTot > 0 ? wSum / wTot : null;
+        };
+
+        const coolingRateCPerMin = _segSlope(onSegs);
+        const heatLeakRateCPerMin = _segSlope(nonOnSegs);
+
+        // Avg ΔT (fridge − door); tempData and ambData share the same timeline indices
+        let deltaSum = 0;
+        let deltaCount = 0;
+        for (let i = 0; i < tempData.length; i++) {
+          if (tempData[i].x < xMin || tempData[i].x > xMax) continue;
+          if (tempData[i].y === null || ambData[i].y === null) continue;
+          deltaSum += tempData[i].y - ambData[i].y;
+          deltaCount++;
+        }
+        const avgDeltaT = deltaCount > 0 ? deltaSum / deltaCount : null;
+
+        this.histCycleStats = { count: cycleCount, avgOnSec, avgOffSec, startsPerHour };
+        this.histThermalStats = { coolingRateCPerMin, heatLeakRateCPerMin, avgDeltaT };
+      }
 
       // Y - axis
       let yTempMin;

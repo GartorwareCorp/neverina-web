@@ -137,6 +137,7 @@
               <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Compressor</p>
               <div class="mt-2">
                 <span class="badge badge-lg font-semibold" :class="stateBadgeClass()" x-text="stateLabel()"></span>
+                <span class="badge badge-sm badge-outline ml-1" x-text="status.controlMode === 1 ? 'ADV' : 'STD'"></span>
               </div>
               </div>
               </div>
@@ -267,24 +268,96 @@
 
             <div class="divider my-0"></div>
 
+            <!-- Control mode -->
+            <div>
+              <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Control mode</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Mode</span></div>
+                  <select class="select select-bordered select-sm" x-model.number="params.controlMode">
+                    <option value="0">Simple</option>
+                    <option value="1">Advanced (dual sensor)</option>
+                  </select>
+                  <div class="label"><span class="label-text-alt text-base-content/40">Simple: probe only. Advanced: probe +
+                      ambient</span></div>
+                </label>
+            
+                <label class="form-control">
+                  <div class="label"><span class="label-text">Ambient offset (°C)</span></div>
+                  <input type="number" step="0.1" class="input input-bordered input-sm"
+                    :class="validationErrors.ambOffset ? 'input-error' : ''" x-model.number="params.ambOffset"
+                    @input="validationErrors.ambOffset = null" />
+                  <div class="label">
+                    <span class="label-text-alt" :class="validationErrors.ambOffset ? 'text-error' : 'text-base-content/40'"
+                      x-text="validationErrors.ambOffset || 'SHT30 calibration: −20 to +20 °C'"></span>
+                  </div>
+                </label>
+            
+              </div>
+            </div>
+            
+            <!-- Advanced mode settings (visible only when mode=1) -->
+            <template x-if="params.controlMode === 1">
+              <div>
+                <div class="divider my-0"></div>
+                <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Advanced mode</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+                  <label class="form-control">
+                    <div class="label"><span class="label-text">Ambient start temp (°C)</span></div>
+                    <input type="number" step="0.5" class="input input-bordered input-sm" x-model.number="params.ambStart" />
+                    <div class="label"><span class="label-text-alt text-base-content/40">Ambient temp threshold for start. Safety:
+                        +1°C
+                        above this</span></div>
+                  </label>
+            
+                  <label class="form-control">
+                    <div class="label"><span class="label-text">Slope stop (°C/min)</span></div>
+                    <input type="number" step="0.001" class="input input-bordered input-sm"
+                      :class="validationErrors.slopeStop ? 'input-error' : ''" x-model.number="params.slopeStop"
+                      @input="validationErrors.slopeStop = null" />
+                    <div class="label">
+                      <span class="label-text-alt" :class="validationErrors.slopeStop ? 'text-error' : 'text-base-content/40'"
+                        x-text="validationErrors.slopeStop || 'Plateau threshold (−1.0 to 0.0)'"></span>
+                    </div>
+                  </label>
+            
+                </div>
+              </div>
+            </template>
+            
+            <div class="divider my-0"></div>
+
             <!-- Timings -->
             <div>
               <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Timings (seconds)</p>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                 <label class="form-control">
-                  <div class="label"><span class="label-text">Min off time</span></div>
-                  <input type="number" step="10" min="120" max="600" class="input input-bordered input-sm"
+                  <div class="label"><span class="label-text">Min OFF time</span></div>
+                  <input type="number" step="10" min="180" max="600" class="input input-bordered input-sm"
                     :class="validationErrors.minOff ? 'input-error' : ''" x-model.number="params.minOff"
                     @input="validationErrors.minOff = null" />
                   <div class="label">
                     <span class="label-text-alt" :class="validationErrors.minOff ? 'text-error' : 'text-base-content/40'"
-                      x-text="validationErrors.minOff || '120 – 600 s (2 – 10 min)'"></span>
+                      x-text="validationErrors.minOff || '180 – 600 s (3 – 10 min)'"></span>
                   </div>
                 </label>
 
                 <label class="form-control">
-                  <div class="label"><span class="label-text">Max run time</span></div>
+                  <div class="label"><span class="label-text">Min ON time</span></div>
+                  <input type="number" step="30" min="180" max="600" class="input input-bordered input-sm"
+                    :class="validationErrors.minOn ? 'input-error' : ''" x-model.number="params.minOn"
+                    @input="validationErrors.minOn = null" />
+                  <div class="label">
+                    <span class="label-text-alt" :class="validationErrors.minOn ? 'text-error' : 'text-base-content/40'"
+                      x-text="validationErrors.minOn || '180 – 600 s (3 – 10 min)'"></span>
+                  </div>
+                  </label>
+                  
+                  <label class="form-control">
+                    <div class="label"><span class="label-text">Max ON time</span></div>
                   <input type="number" step="60" min="600" max="7200" class="input input-bordered input-sm"
                     :class="validationErrors.maxRun ? 'input-error' : ''" x-model.number="params.maxRun"
                     @input="validationErrors.maxRun = null" />
@@ -296,12 +369,12 @@
 
                 <label class="form-control">
                   <div class="label"><span class="label-text">Cooldown time</span></div>
-                  <input type="number" step="30" min="120" max="1800" class="input input-bordered input-sm"
+                  <input type="number" step="30" min="180" max="1800" class="input input-bordered input-sm"
                     :class="validationErrors.cooldown ? 'input-error' : ''" x-model.number="params.cooldown"
                     @input="validationErrors.cooldown = null" />
                   <div class="label">
                     <span class="label-text-alt" :class="validationErrors.cooldown ? 'text-error' : 'text-base-content/40'"
-                      x-text="validationErrors.cooldown || '120 – 1800 s (2 – 30 min)'"></span>
+                      x-text="validationErrors.cooldown || '180 – 1800 s, ≥ Min off time'"></span>
                   </div>
                 </label>
 

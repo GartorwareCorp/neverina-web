@@ -8,14 +8,13 @@ const CHAR_UUID = {
   MAX_RUN: "6e657665-7269-6e61-8000-000000000014",
   COOLDOWN: "6e657665-7269-6e61-8000-000000000015",
   TEMP_INT: "6e657665-7269-6e61-8000-000000000016",
-  // Status
-  CURR_TEMP: "6e657665-7269-6e61-8000-000000000021",
-  COMP_STATE: "6e657665-7269-6e61-8000-000000000022",
-  STATE_TIME: "6e657665-7269-6e61-8000-000000000023",
-  ERR_STATUS: "6e657665-7269-6e61-8000-000000000024",
-  UPTIME: "6e657665-7269-6e61-8000-000000000025",
-  CURR_AMB: "6e657665-7269-6e61-8000-000000000026",
-  CURR_HUM: "6e657665-7269-6e61-8000-000000000027",
+  AMB_OFFSET: "6e657665-7269-6e61-8000-000000000017",
+  CONTROL_MODE: "6e657665-7269-6e61-8000-000000000018",
+  AMB_START: "6e657665-7269-6e61-8000-000000000019",
+  SLOPE_STOP: "6e657665-7269-6e61-8000-00000000001a",
+  MIN_ON: "6e657665-7269-6e61-8000-00000000001b",
+  // Status blob
+  STATUS_BLOB: "6e657665-7269-6e61-8000-000000000020",
   // History
   TIME_SYNC: "6e657665-7269-6e61-8000-000000000031",
   HIST_CTRL: "6e657665-7269-6e61-8000-000000000041",
@@ -50,10 +49,15 @@ function neverina() {
     params: {
       tempStop: 0.0,
       tempStart: 6.0,
-      minOff: 240,
+      minOff: 300,
       maxRun: 3000,
       cooldown: 600,
       tempInt: 10,
+      ambOffset: 0.0,
+      controlMode: 0,
+      ambStart: 6.5,
+      slopeStop: -0.02,
+      minOn: 300,
     },
 
     // ── Live status (updated via BLE notifications) ────────────
@@ -65,6 +69,7 @@ function neverina() {
       stateTime: null, // uint32 seconds in current state
       errors: null, // uint8 bitmask (null = unknown, 0 = OK)
       uptime: null, // uint32 seconds since boot
+      controlMode: 0, // 0=simple 1=advanced
     },
 
     // ── Time sync anchor (set on each connect) ─────────────────
@@ -193,12 +198,16 @@ function neverina() {
       try {
         const rf = async (c) => {
           const v = await c.readValue();
-          if (v.byteLength < 4) return null; // uninitialized characteristic
+          if (v.byteLength < 4) return null;
           return v.getFloat32(0, true);
         };
         const ru = async (c) => {
           const v = await c.readValue();
           return v.getUint32(0, true);
+        };
+        const ru8 = async (c) => {
+          const v = await c.readValue();
+          return v.getUint8(0);
         };
 
         this.params.tempStop = +(await rf(this._chars.TEMP_STOP)).toFixed(1);
@@ -207,32 +216,54 @@ function neverina() {
         this.params.maxRun = await ru(this._chars.MAX_RUN);
         this.params.cooldown = await ru(this._chars.COOLDOWN);
         this.params.tempInt = await ru(this._chars.TEMP_INT);
+        this.params.ambOffset = +(await rf(this._chars.AMB_OFFSET)).toFixed(1);
+        this.params.controlMode = await ru8(this._chars.CONTROL_MODE);
+        this.params.ambStart = +(await rf(this._chars.AMB_START)).toFixed(1);
+        this.params.slopeStop = +(await rf(this._chars.SLOPE_STOP)).toFixed(3);
+        this.params.minOn = await ru(this._chars.MIN_ON);
 
-        const tempVal = await rf(this._chars.CURR_TEMP);
-        this.status.temp = this.isValidTemp(tempVal) ? tempVal : null;
-        const ambVal = await rf(this._chars.CURR_AMB);
-        this.status.ambTemp = this.isValidTemp(ambVal) ? ambVal : null;
-        const humVal = await rf(this._chars.CURR_HUM);
-        this.status.humidity = this.isValidHumidity(humVal) ? humVal : null;
-        this.status.state = (await this._chars.COMP_STATE.readValue()).getUint8(0);
-        this.status.stateTime = await ru(this._chars.STATE_TIME);
-        this.status.errors = (await this._chars.ERR_STATUS.readValue()).getUint8(0);
-        this.status.uptime = (await this._chars.UPTIME.readValue()).getUint32(0, true);
+        // Read status blob
+        this._parseStatusBlob(await this._chars.STATUS_BLOB.readValue());
       } catch (err) {
         console.error("readAll failed:", err);
       }
     },
 
+    _parseStatusBlob(dv) {
+      if (!dv || dv.byteLength < 24) return;
+      const version = dv.getUint8(0);
+      if (version !== 1) {
+        console.warn("Unknown STATUS_BLOB version:", version);
+        return;
+      }
+      const tempVal = dv.getFloat32(1, true);
+      this.status.temp = this.isValidTemp(tempVal) ? tempVal : null;
+      const ambVal = dv.getFloat32(5, true);
+      this.status.ambTemp = this.isValidTemp(ambVal) ? ambVal : null;
+      const humVal = dv.getFloat32(9, true);
+      this.status.humidity = this.isValidHumidity(humVal) ? humVal : null;
+      this.status.state = dv.getUint8(13);
+      this.status.stateTime = dv.getUint32(14, true);
+      this.status.uptime = dv.getUint32(18, true);
+      this.status.errors = dv.getUint8(22);
+      this.status.controlMode = dv.getUint8(23);
+    },
+
     _validateParams() {
       const e = {};
-      if (this.params.minOff < 120) e.minOff = "Minimum 2 min (120 s)";
+      if (this.params.minOff < 180) e.minOff = "Minimum 180 s";
       if (this.params.minOff > 600) e.minOff = "Maximum 600 s";
       if (this.params.maxRun < 600) e.maxRun = "Minimum 10 min (600 s)";
       if (this.params.maxRun > 7200) e.maxRun = "Maximum 7200 s";
-      if (this.params.cooldown < 120) e.cooldown = "Minimum 2 min (120 s)";
+      if (this.params.cooldown < 180) e.cooldown = "Minimum 180 s";
       if (this.params.cooldown > 1800) e.cooldown = "Maximum 1800 s";
+      if (!e.cooldown && this.params.cooldown < this.params.minOff) e.cooldown = "Must be ≥ Min off time";
       if (this.params.tempInt < 5) e.tempInt = "Minimum 5 s";
       if (this.params.tempInt > 60) e.tempInt = "Maximum 60 s";
+      if (this.params.ambOffset < -20 || this.params.ambOffset > 20) e.ambOffset = "Range −20 to 20 °C";
+      if (this.params.slopeStop < -1 || this.params.slopeStop > 0) e.slopeStop = "Range −1.0 to 0.0 °C/min";
+      if (this.params.minOn < 180) e.minOn = "Minimum 180 s";
+      if (this.params.minOn > 600) e.minOn = "Maximum 600 s";
       return e;
     },
 
@@ -253,6 +284,11 @@ function neverina() {
           new DataView(buf).setUint32(0, parseInt(val), true);
           await c.writeValueWithResponse(buf);
         };
+        const wu8 = async (c, val) => {
+          const buf = new ArrayBuffer(1);
+          new DataView(buf).setUint8(0, parseInt(val));
+          await c.writeValueWithResponse(buf);
+        };
 
         await wf(this._chars.TEMP_STOP, this.params.tempStop);
         await wf(this._chars.TEMP_START, this.params.tempStart);
@@ -260,6 +296,11 @@ function neverina() {
         await wu(this._chars.MAX_RUN, this.params.maxRun);
         await wu(this._chars.COOLDOWN, this.params.cooldown);
         await wu(this._chars.TEMP_INT, this.params.tempInt);
+        await wf(this._chars.AMB_OFFSET, this.params.ambOffset);
+        await wu8(this._chars.CONTROL_MODE, this.params.controlMode);
+        await wf(this._chars.AMB_START, this.params.ambStart);
+        await wf(this._chars.SLOPE_STOP, this.params.slopeStop);
+        await wu(this._chars.MIN_ON, this.params.minOn);
       } catch (err) {
         this.saveError = err.message || "Write failed";
       } finally {
@@ -432,6 +473,7 @@ function neverina() {
         stateTime: null,
         errors: null,
         uptime: null,
+        controlMode: 0,
       };
       this._chars = {};
       this.tempRecords = [];
@@ -461,49 +503,9 @@ function neverina() {
     async _subscribeCharacteristics() {
       const self = this;
 
-      await this._chars.CURR_TEMP.startNotifications();
-      this._chars.CURR_TEMP.addEventListener("characteristicvaluechanged", (e) => {
-        if (!e.target.value || e.target.value.byteLength < 4) return;
-        const val = e.target.value.getFloat32(0, true);
-        self.status.temp = self.isValidTemp(val) ? val : null;
-      });
-
-      await this._chars.COMP_STATE.startNotifications();
-      this._chars.COMP_STATE.addEventListener("characteristicvaluechanged", (e) => {
-        if (!e.target.value || e.target.value.byteLength < 1) return;
-        self.status.state = e.target.value.getUint8(0);
-      });
-
-      await this._chars.STATE_TIME.startNotifications();
-      this._chars.STATE_TIME.addEventListener("characteristicvaluechanged", (e) => {
-        if (!e.target.value || e.target.value.byteLength < 4) return;
-        self.status.stateTime = e.target.value.getUint32(0, true);
-      });
-
-      await this._chars.ERR_STATUS.startNotifications();
-      this._chars.ERR_STATUS.addEventListener("characteristicvaluechanged", (e) => {
-        if (!e.target.value || e.target.value.byteLength < 1) return;
-        self.status.errors = e.target.value.getUint8(0);
-      });
-
-      await this._chars.UPTIME.startNotifications();
-      this._chars.UPTIME.addEventListener("characteristicvaluechanged", (e) => {
-        if (!e.target.value || e.target.value.byteLength < 4) return;
-        self.status.uptime = e.target.value.getUint32(0, true);
-      });
-
-      await this._chars.CURR_AMB.startNotifications();
-      this._chars.CURR_AMB.addEventListener("characteristicvaluechanged", (e) => {
-        if (!e.target.value || e.target.value.byteLength < 4) return;
-        const val = e.target.value.getFloat32(0, true);
-        self.status.ambTemp = self.isValidTemp(val) ? val : null;
-      });
-
-      await this._chars.CURR_HUM.startNotifications();
-      this._chars.CURR_HUM.addEventListener("characteristicvaluechanged", (e) => {
-        if (!e.target.value || e.target.value.byteLength < 4) return;
-        const val = e.target.value.getFloat32(0, true);
-        self.status.humidity = self.isValidHumidity(val) ? val : null;
+      await this._chars.STATUS_BLOB.startNotifications();
+      this._chars.STATUS_BLOB.addEventListener("characteristicvaluechanged", (e) => {
+        self._parseStatusBlob(e.target.value);
       });
 
       await this._chars.HIST_DATA.startNotifications();

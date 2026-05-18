@@ -171,22 +171,25 @@
             <p x-show="histError" class="text-xs text-error" x-text="histError"></p>
             <canvas id="histChart" height="200"></canvas>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" x-show="histStateTotals.totalMs > 0">
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">OFF</p>
-                <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.offMs / 1000))"></p>
-                <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.offMs))"></p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">CoolDown</p>
-                <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.cooldownMs / 1000))"></p>
-                <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.cooldownMs))"></p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">ON</p>
-                <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.onMs / 1000))"></p>
-                <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
-              </div>
+            <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histStateTotals.totalMs > 0">
+              <p class="text-xs text-base-content/60 uppercase tracking-wide">Compressor time</p>
+              <div class="flex justify-between mt-1">
+                <div class="text-center">
+                  <p class="text-[10px] text-base-content/40 uppercase">OFF</p>
+                  <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.offMs / 1000))"></p>
+                  <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.offMs))"></p>
+                </div>
+                <div class="text-center">
+                  <p class="text-[10px] text-base-content/40 uppercase">CoolDown</p>
+                  <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.cooldownMs / 1000))"></p>
+                  <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.cooldownMs))"></p>
+                </div>
+                <div class="text-center">
+                  <p class="text-[10px] text-base-content/40 uppercase">ON</p>
+                  <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.onMs / 1000))"></p>
+                  <p class="text-xs text-base-content/60" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
+                </div>
+                </div>
             </div>
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" x-show="histTempStats.min !== null || histAmbStats.min !== null">
   <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histTempStats.min !== null">
@@ -226,53 +229,62 @@
 </div>
 
             <!-- ── Compressor cycle stats ──────────────────────────────── -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2"
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2"
               x-show="histCycleStats.count !== null && histCycleStats.count > 0">
               <div class="rounded-lg bg-base-200 px-3 py-2">
                 <p class="text-xs text-base-content/60 uppercase tracking-wide">Cycles</p>
-                <p class="text-sm font-semibold" x-text="histCycleStats.count"></p>
-                <p class="text-xs text-base-content/60"
-                  x-text="histCycleStats.startsPerHour !== null ? histCycleStats.startsPerHour.toFixed(1) + ' /h' : '—'"></p>
+                <div class="flex justify-between mt-1">
+                  <div class="text-center">
+                    <p class="text-[10px] text-base-content/40 uppercase">Count</p>
+                    <p class="text-sm font-semibold" x-text="histCycleStats.count"></p>
+                  </div>
+                  <div class="text-center">
+                    <p class="text-[10px] text-base-content/40 uppercase">/hour</p>
+                    <p class="text-sm font-semibold"
+                      x-text="histCycleStats.startsPerHour !== null ? histCycleStats.startsPerHour.toFixed(1) : '—'"></p>
+                  </div>
+                  <div class="text-center">
+                    <p class="text-[10px] text-base-content/40 uppercase">Duty</p>
+                    <p class="text-sm font-semibold" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
+                  </div>
+                  </div>
               </div>
               <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg ON</p>
-                <p class="text-sm font-semibold"
-                  x-text="histCycleStats.avgOnSec !== null ? formatDuration(Math.round(histCycleStats.avgOnSec)) : '—'"></p>
-                <p class="text-xs text-base-content/60">per cycle</p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg OFF</p>
-                <p class="text-sm font-semibold"
-                  x-text="histCycleStats.avgOffSec !== null ? formatDuration(Math.round(histCycleStats.avgOffSec)) : '—'"></p>
-                <p class="text-xs text-base-content/60">between cycles</p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">Duty cycle</p>
-                <p class="text-sm font-semibold" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
-                <p class="text-xs text-base-content/60">compressor ON</p>
+                <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg cycle time</p>
+                <div class="flex justify-between mt-1">
+                  <div class="text-center">
+                    <p class="text-[10px] text-base-content/40 uppercase">ON</p>
+                    <p class="text-sm font-semibold"
+                      x-text="histCycleStats.avgOnSec !== null ? formatDuration(Math.round(histCycleStats.avgOnSec)) : '—'"></p>
+                  </div>
+                  <div class="text-center">
+                    <p class="text-[10px] text-base-content/40 uppercase">OFF</p>
+                    <p class="text-sm font-semibold"
+                      x-text="histCycleStats.avgOffSec !== null ? formatDuration(Math.round(histCycleStats.avgOffSec)) : '—'"></p>
+                  </div>
+                </div>
               </div>
             </div>
 
             <!-- ── Thermal performance stats ───────────────────────────── -->
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2"
-              x-show="histThermalStats.coolingRateCPerMin !== null || histThermalStats.heatLeakRateCPerMin !== null || histThermalStats.avgDeltaT !== null">
-              <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.coolingRateCPerMin !== null">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">Cooling rate</p>
-                <p class="text-sm font-semibold"
-                  x-text="(histThermalStats.coolingRateCPerMin >= 0 ? '+' : '') + histThermalStats.coolingRateCPerMin.toFixed(2) + ' °C/min'"></p>
-                <p class="text-xs text-base-content/60">while compressor ON</p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.heatLeakRateCPerMin !== null">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">Heat leak</p>
-                <p class="text-sm font-semibold"
-                  x-text="(histThermalStats.heatLeakRateCPerMin >= 0 ? '+' : '') + histThermalStats.heatLeakRateCPerMin.toFixed(2) + ' °C/min'"></p>
-                <p class="text-xs text-base-content/60">while compressor OFF</p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.avgDeltaT !== null">
-                <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg ΔT</p>
-                <p class="text-sm font-semibold"
-                  x-text="(histThermalStats.avgDeltaT >= 0 ? '+' : '') + histThermalStats.avgDeltaT.toFixed(1) + ' °C'"></p>
-                <p class="text-xs text-base-content/60">fridge − door</p>
+            <div class="rounded-lg bg-base-200 px-3 py-2 mt-2"
+              x-show="histThermalStats.coolingRateCPerMin !== null || histThermalStats.heatLeakRateCPerMin !== null">
+              <p class="text-xs text-base-content/60 uppercase tracking-wide">Thermal performance</p>
+              <div class="flex justify-between mt-1">
+                <div class="text-center" x-show="histThermalStats.coolingRateCPerMin !== null">
+                  <p class="text-[10px] text-base-content/40 uppercase">Cooling</p>
+                  <p class="text-sm font-semibold"
+                    x-text="(histThermalStats.coolingRateCPerMin >= 0 ? '+' : '') + histThermalStats.coolingRateCPerMin.toFixed(2) + ' °C/min'">
+                  </p>
+                  <p class="text-xs text-base-content/60">comp ON</p>
+                </div>
+                <div class="text-center" x-show="histThermalStats.heatLeakRateCPerMin !== null">
+                  <p class="text-[10px] text-base-content/40 uppercase">Heat leak</p>
+                  <p class="text-sm font-semibold"
+                    x-text="(histThermalStats.heatLeakRateCPerMin >= 0 ? '+' : '') + histThermalStats.heatLeakRateCPerMin.toFixed(2) + ' °C/min'">
+                  </p>
+                  <p class="text-xs text-base-content/60">comp OFF</p>
+                </div>
               </div>
             </div>
             </div>
@@ -356,11 +368,13 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Ambient start temp (°C)</span></div>
-                    <input type="number" step="0.5" class="input input-bordered input-sm" x-model.number="params.ambStart" />
-                    <div class="label"><span class="label-text-alt text-base-content/40">Ambient temp threshold for start. Safety:
-                        +1°C
-                        above this</span></div>
+                    <div class="label"><span class="label-text">Effective stop (°C)</span></div>
+                    <input type="number" step="0.5" min="-10" max="15" class="input input-bordered input-sm"
+                      :class="validationErrors.effStop ? 'input-error' : ''" x-model.number="params.effStop"
+                      @input="validationErrors.effStop = null" />
+                    <div class="label"><span class="label-text-alt"
+                        :class="validationErrors.effStop ? 'text-error' : 'text-base-content/40'"
+                        x-text="validationErrors.effStop || 'Target for \u03b1\u00b7wall+(1\u2212\u03b1)\u00b7door. Range \u221210 to 15 \u00b0C'"></span></div>
                   </label>
             
                   <label class="form-control">

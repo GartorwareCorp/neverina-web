@@ -55,7 +55,7 @@ function neverina() {
       tempInt: 10,
       ambOffset: 0.0,
       controlMode: 0,
-      ambStart: 6.5,
+      effStop: 2.0,
       slopeStop: -0.02,
       minOn: 300,
     },
@@ -87,7 +87,7 @@ function neverina() {
     histTempStats: { min: null, avg: null, max: null },
     histAmbStats: { min: null, avg: null, max: null },
     histCycleStats: { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null },
-    histThermalStats: { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null },
+    histThermalStats: { coolingRateCPerMin: null, heatLeakRateCPerMin: null },
     histRangeOptions: [
       { label: "5min", ms: 5 * 60 * 1000 },
       { label: "15min", ms: 15 * 60 * 1000 },
@@ -221,7 +221,7 @@ function neverina() {
         this.params.tempInt = await ru(this._chars.TEMP_INT);
         this.params.ambOffset = +(await rf(this._chars.AMB_OFFSET)).toFixed(1);
         this.params.controlMode = await ru8(this._chars.CONTROL_MODE);
-        this.params.ambStart = +(await rf(this._chars.AMB_START)).toFixed(1);
+        this.params.effStop = +(await rf(this._chars.AMB_START)).toFixed(1);
         this.params.slopeStop = +(await rf(this._chars.SLOPE_STOP)).toFixed(3);
         this.params.minOn = await ru(this._chars.MIN_ON);
 
@@ -264,6 +264,7 @@ function neverina() {
       if (this.params.tempInt < 5) e.tempInt = "Minimum 5 s";
       if (this.params.tempInt > 60) e.tempInt = "Maximum 60 s";
       if (this.params.ambOffset < -20 || this.params.ambOffset > 20) e.ambOffset = "Range −20 to 20 °C";
+      if (this.params.effStop < -10 || this.params.effStop > 15) e.effStop = "Range −10 to 15 °C";
       if (this.params.slopeStop < -1 || this.params.slopeStop > 0) e.slopeStop = "Range −1.0 to 0.0 °C/min";
       if (this.params.minOn < 180) e.minOn = "Minimum 180 s";
       if (this.params.minOn > 600) e.minOn = "Maximum 600 s";
@@ -301,7 +302,7 @@ function neverina() {
         await wu(this._chars.TEMP_INT, this.params.tempInt);
         await wf(this._chars.AMB_OFFSET, this.params.ambOffset);
         await wu8(this._chars.CONTROL_MODE, this.params.controlMode);
-        await wf(this._chars.AMB_START, this.params.ambStart);
+        await wf(this._chars.AMB_START, this.params.effStop);
         await wf(this._chars.SLOPE_STOP, this.params.slopeStop);
         await wu(this._chars.MIN_ON, this.params.minOn);
       } catch (err) {
@@ -469,7 +470,7 @@ function neverina() {
       this.histTempStats = { min: null, avg: null, max: null };
       this.histAmbStats = { min: null, avg: null, max: null };
       this.histCycleStats = { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null };
-      this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null };
+      this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null };
       this.status = {
         temp: null,
         ambTemp: null,
@@ -736,7 +737,7 @@ function neverina() {
         this.histTempStats = { min: null, avg: null, max: null };
         this.histAmbStats = { min: null, avg: null, max: null };
         this.histCycleStats = { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null };
-        this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null };
+        this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null };
         return;
       }
 
@@ -797,7 +798,7 @@ function neverina() {
         xMin = undefined;
         xMax = undefined;
         this.histCycleStats = { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null };
-        this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null, avgDeltaT: null };
+        this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null };
         return;
       }
 
@@ -922,19 +923,8 @@ function neverina() {
         const coolingRateCPerMin = _segSlope(onSegs);
         const heatLeakRateCPerMin = _segSlope(nonOnSegs);
 
-        // Avg ΔT (fridge − door); tempData and ambData share the same timeline indices
-        let deltaSum = 0;
-        let deltaCount = 0;
-        for (let i = 0; i < tempData.length; i++) {
-          if (tempData[i].x < xMin || tempData[i].x > xMax) continue;
-          if (tempData[i].y === null || ambData[i].y === null) continue;
-          deltaSum += tempData[i].y - ambData[i].y;
-          deltaCount++;
-        }
-        const avgDeltaT = deltaCount > 0 ? deltaSum / deltaCount : null;
-
         this.histCycleStats = { count: cycleCount, avgOnSec, avgOffSec, startsPerHour };
-        this.histThermalStats = { coolingRateCPerMin, heatLeakRateCPerMin, avgDeltaT };
+        this.histThermalStats = { coolingRateCPerMin, heatLeakRateCPerMin };
       }
 
       // Y - axis

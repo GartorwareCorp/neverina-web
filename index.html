@@ -376,46 +376,6 @@
                 </div>
               </div>
 
-              <div class="divider my-0"></div>
-
-              <!-- Control mode -->
-              <div>
-                <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Control mode</p>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <label class="form-control">
-                    <div class="label"><span class="label-text">Mode</span></div>
-                    <select class="select select-bordered select-sm" x-model.number="params.controlMode">
-                      <option value="0">Simple</option>
-                      <option value="1">Advanced (dual sensor)</option>
-                    </select>
-                    <div class="label">
-                      <span class="label-text-alt text-base-content/40"
-                        >Simple: probe only. Advanced: probe + ambient</span
-                      >
-                    </div>
-                  </label>
-
-                  <label class="form-control">
-                    <div class="label"><span class="label-text">Ambient offset (°C)</span></div>
-                    <input
-                      type="number"
-                      step="0.1"
-                      class="input input-bordered input-sm"
-                      :class="validationErrors.ambOffset ? 'input-error' : ''"
-                      x-model.number="params.ambOffset"
-                      @input="validationErrors.ambOffset = null"
-                    />
-                    <div class="label">
-                      <span
-                        class="label-text-alt"
-                        :class="validationErrors.ambOffset ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.ambOffset || 'SHT30 calibration: −20 to +20 °C'"
-                      ></span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
               <!-- Advanced mode settings (visible only when mode=1) -->
               <template x-if="params.controlMode === 1">
                 <div>
@@ -464,6 +424,46 @@
                   </div>
                 </div>
               </template>
+
+              <div class="divider my-0"></div>
+
+              <!-- Control mode -->
+              <div>
+                <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Control mode</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <label class="form-control">
+                    <div class="label"><span class="label-text">Ambient offset (°C)</span></div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      class="input input-bordered input-sm"
+                      :class="validationErrors.ambOffset ? 'input-error' : ''"
+                      x-model.number="params.ambOffset"
+                      @input="validationErrors.ambOffset = null"
+                    />
+                    <div class="label">
+                      <span
+                        class="label-text-alt"
+                        :class="validationErrors.ambOffset ? 'text-error' : 'text-base-content/40'"
+                        x-text="validationErrors.ambOffset || 'SHT30 calibration: −20 to +20 °C'"
+                      ></span>
+                    </div>
+                  </label>
+
+                  <label class="form-control">
+                    <div class="label"><span class="label-text">Mode</span></div>
+                    <select class="select select-bordered select-sm" x-model.number="params.controlMode">
+                      <option value="0">Simple</option>
+                      <option value="1">Advanced (dual sensor)</option>
+                    </select>
+                    <div class="label">
+                      <span class="label-text-alt text-base-content/40"
+                        >Simple: probe only. Advanced: probe + ambient</span
+                      >
+                    </div>
+                  </label>
+                </div>
+              </div>
 
               <div class="divider my-0"></div>
 

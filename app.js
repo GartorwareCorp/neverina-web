@@ -50,16 +50,16 @@ function neverina() {
     params: {
       tempStop: 0.0,
       tempStart: 6.0,
-      minOff: 300,
-      maxOn: 3000,
-      maxOff: 1200,
-      cooldown: 600,
+      minOff: 5,
+      maxOn: 50,
+      maxOff: 20,
+      cooldown: 10,
       tempInt: 10,
       ambOffset: 0.0,
       controlMode: 0,
       effStop: 2.0,
       slopeStop: -0.02,
-      minOn: 300,
+      minOn: 5,
     },
 
     // ── Live status (updated via BLE notifications) ────────────
@@ -220,16 +220,16 @@ function neverina() {
 
         this.params.tempStop = +(await rf(this._chars.TEMP_STOP)).toFixed(1);
         this.params.tempStart = +(await rf(this._chars.TEMP_START)).toFixed(1);
-        this.params.minOff = await ru(this._chars.MIN_OFF);
-        this.params.maxOn = await ru(this._chars.MAX_RUN);
-        this.params.maxOff = await ru(this._chars.MAX_OFF);
-        this.params.cooldown = await ru(this._chars.COOLDOWN);
+        this.params.minOff = this._secondsToMinutes(await ru(this._chars.MIN_OFF));
+        this.params.maxOn = this._secondsToMinutes(await ru(this._chars.MAX_RUN));
+        this.params.maxOff = this._secondsToMinutes(await ru(this._chars.MAX_OFF));
+        this.params.cooldown = this._secondsToMinutes(await ru(this._chars.COOLDOWN));
         this.params.tempInt = await ru(this._chars.TEMP_INT);
         this.params.ambOffset = +(await rf(this._chars.AMB_OFFSET)).toFixed(1);
         this.params.controlMode = await ru8(this._chars.CONTROL_MODE);
         this.params.effStop = +(await rf(this._chars.AMB_START)).toFixed(1);
         this.params.slopeStop = +(await rf(this._chars.SLOPE_STOP)).toFixed(3);
-        this.params.minOn = await ru(this._chars.MIN_ON);
+        this.params.minOn = this._secondsToMinutes(await ru(this._chars.MIN_ON));
 
         // Read status blob
         this._parseStatusBlob(await this._chars.STATUS_BLOB.readValue());
@@ -272,14 +272,14 @@ function neverina() {
 
     _validateParams() {
       const e = {};
-      if (this.params.minOff < 180) e.minOff = "Minimum 180 s";
-      if (this.params.minOff > 600) e.minOff = "Maximum 600 s";
-      if (this.params.maxOn < 600) e.maxOn = "Minimum 10 min (600 s)";
-      if (this.params.maxOn > 7200) e.maxOn = "Maximum 7200 s";
-      if (this.params.maxOff < 180) e.maxOff = "Minimum 180 s";
-      if (this.params.maxOff > 28800) e.maxOff = "Maximum 28800 s (8 h)";
-      if (this.params.cooldown < 180) e.cooldown = "Minimum 180 s";
-      if (this.params.cooldown > 28800) e.cooldown = "Maximum 28800 s";
+      if (this.params.minOff < 3) e.minOff = "Minimum 3 min";
+      if (this.params.minOff > 10) e.minOff = "Maximum 10 min";
+      if (this.params.maxOn < 10) e.maxOn = "Minimum 10 min";
+      if (this.params.maxOn > 120) e.maxOn = "Maximum 120 min (2 h)";
+      if (this.params.maxOff < 3) e.maxOff = "Minimum 3 min";
+      if (this.params.maxOff > 480) e.maxOff = "Maximum 480 min (8 h)";
+      if (this.params.cooldown < 3) e.cooldown = "Minimum 3 min";
+      if (this.params.cooldown > 480) e.cooldown = "Maximum 480 min (8 h)";
       if (this.params.minOff > this.params.cooldown || this.params.cooldown > this.params.maxOff) {
         e.cooldown = "Min off ≤ Cooldown ≤ Max off required";
       }
@@ -288,8 +288,8 @@ function neverina() {
       if (this.params.ambOffset < -20 || this.params.ambOffset > 20) e.ambOffset = "Range −20 to 20 °C";
       if (this.params.effStop < -10 || this.params.effStop > 15) e.effStop = "Range −10 to 15 °C";
       if (this.params.slopeStop < -1 || this.params.slopeStop > 0) e.slopeStop = "Range −1.0 to 0.0 °C/min";
-      if (this.params.minOn < 180) e.minOn = "Minimum 180 s";
-      if (this.params.minOn > 600) e.minOn = "Maximum 600 s";
+      if (this.params.minOn < 3) e.minOn = "Minimum 3 min";
+      if (this.params.minOn > 10) e.minOn = "Maximum 10 min";
       return e;
     },
 
@@ -318,21 +318,31 @@ function neverina() {
 
         await wf(this._chars.TEMP_STOP, this.params.tempStop);
         await wf(this._chars.TEMP_START, this.params.tempStart);
-        await wu(this._chars.MIN_OFF, this.params.minOff);
-        await wu(this._chars.MAX_RUN, this.params.maxOn);
-        await wu(this._chars.MAX_OFF, this.params.maxOff);
-        await wu(this._chars.COOLDOWN, this.params.cooldown);
+        await wu(this._chars.MIN_OFF, this._minutesToSeconds(this.params.minOff));
+        await wu(this._chars.MAX_RUN, this._minutesToSeconds(this.params.maxOn));
+        await wu(this._chars.MAX_OFF, this._minutesToSeconds(this.params.maxOff));
+        await wu(this._chars.COOLDOWN, this._minutesToSeconds(this.params.cooldown));
         await wu(this._chars.TEMP_INT, this.params.tempInt);
         await wf(this._chars.AMB_OFFSET, this.params.ambOffset);
         await wu8(this._chars.CONTROL_MODE, this.params.controlMode);
         await wf(this._chars.AMB_START, this.params.effStop);
         await wf(this._chars.SLOPE_STOP, this.params.slopeStop);
-        await wu(this._chars.MIN_ON, this.params.minOn);
+        await wu(this._chars.MIN_ON, this._minutesToSeconds(this.params.minOn));
       } catch (err) {
         this.saveError = err.message || "Write failed";
       } finally {
         this.saving = false;
       }
+    },
+
+    _secondsToMinutes(seconds, decimals = 2) {
+      if (!Number.isFinite(seconds)) return 0;
+      const factor = 10 ** decimals;
+      return Math.round((seconds / 60) * factor) / factor;
+    },
+
+    _minutesToSeconds(minutes) {
+      return Math.round(parseFloat(minutes) * 60);
     },
 
     // Trigger OTA mode on the device via BLE.

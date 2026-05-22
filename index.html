@@ -166,6 +166,39 @@
                 <p class="text-3xl font-bold mt-1" x-text="formatDuration(status.stateTime)"></p>
               </div>
             </div>
+
+            <template x-if="status.controlMode === 1">
+              <div class="card bg-base-100 shadow sm:col-span-2 lg:col-span-3">
+                <div class="card-body p-4">
+                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-2">
+                    Advanced control
+                  </p>
+                  <div class="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p class="text-xs text-base-content/50">ambFloor EMA</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.ambFloorEma !== null ? status.ambFloorEma.toFixed(1) + ' °C' : '—'"
+                      ></p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-base-content/50">gap</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.gap !== null ? status.gap.toFixed(1) + ' °C' : '—'"
+                      ></p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-base-content/50">temp stop target</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.tempStopTarget !== null ? status.tempStopTarget.toFixed(1) + ' °C' : '—'"
+                      ></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
 
           <!-- History chart -->
@@ -398,7 +431,7 @@
                         <span
                           class="label-text-alt"
                           :class="validationErrors.effStop ? 'text-error' : 'text-base-content/40'"
-                          x-text="validationErrors.effStop || 'Target for \u03b1\u00b7wall+(1\u2212\u03b1)\u00b7door. Range \u221210 to 15 \u00b0C'"
+                          x-text="validationErrors.effStop || 'Comfort target for ambTemp (gap reference). Range \u221210 to 15 \u00b0C'"
                         ></span>
                       </div>
                     </label>
@@ -472,27 +505,6 @@
                 <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Timings (seconds)</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Min OFF time</span></div>
-                    <input
-                      type="number"
-                      step="10"
-                      min="180"
-                      max="600"
-                      class="input input-bordered input-sm"
-                      :class="validationErrors.minOff ? 'input-error' : ''"
-                      x-model.number="params.minOff"
-                      @input="validationErrors.minOff = null"
-                    />
-                    <div class="label">
-                      <span
-                        class="label-text-alt"
-                        :class="validationErrors.minOff ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.minOff || '180 – 600 s (3 – 10 min)'"
-                      ></span>
-                    </div>
-                  </label>
-
-                  <label class="form-control">
                     <div class="label"><span class="label-text">Min ON time</span></div>
                     <input
                       type="number"
@@ -514,6 +526,27 @@
                   </label>
 
                   <label class="form-control">
+                    <div class="label"><span class="label-text">Min OFF time</span></div>
+                    <input
+                      type="number"
+                      step="10"
+                      min="180"
+                      max="600"
+                      class="input input-bordered input-sm"
+                      :class="validationErrors.minOff ? 'input-error' : ''"
+                      x-model.number="params.minOff"
+                      @input="validationErrors.minOff = null; validationErrors.cooldown = null"
+                    />
+                    <div class="label">
+                      <span
+                        class="label-text-alt"
+                        :class="validationErrors.minOff ? 'text-error' : 'text-base-content/40'"
+                        x-text="validationErrors.minOff || '180 – 600 s (3 – 10 min)'"
+                      ></span>
+                    </div>
+                  </label>
+
+                  <label class="form-control">
                     <div class="label"><span class="label-text">Max ON time</span></div>
                     <input
                       type="number"
@@ -521,15 +554,36 @@
                       min="600"
                       max="7200"
                       class="input input-bordered input-sm"
-                      :class="validationErrors.maxRun ? 'input-error' : ''"
-                      x-model.number="params.maxRun"
-                      @input="validationErrors.maxRun = null"
+                      :class="validationErrors.maxOn ? 'input-error' : ''"
+                      x-model.number="params.maxOn"
+                      @input="validationErrors.maxOn = null"
                     />
                     <div class="label">
                       <span
                         class="label-text-alt"
-                        :class="validationErrors.maxRun ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.maxRun || '600 – 7200 s (10 min – 2 h)'"
+                        :class="validationErrors.maxOn ? 'text-error' : 'text-base-content/40'"
+                        x-text="validationErrors.maxOn || '600 – 7200 s (10 min – 2 h)'"
+                      ></span>
+                    </div>
+                  </label>
+
+                  <label class="form-control">
+                    <div class="label"><span class="label-text">Max OFF time</span></div>
+                    <input
+                      type="number"
+                      step="60"
+                      min="180"
+                      max="28800"
+                      class="input input-bordered input-sm"
+                      :class="validationErrors.maxOff ? 'input-error' : ''"
+                      x-model.number="params.maxOff"
+                      @input="validationErrors.maxOff = null; validationErrors.cooldown = null"
+                    />
+                    <div class="label">
+                      <span
+                        class="label-text-alt"
+                        :class="validationErrors.maxOff ? 'text-error' : 'text-base-content/40'"
+                        x-text="validationErrors.maxOff || 'Default 4× Min ON; forces restart if OFF too long'"
                       ></span>
                     </div>
                   </label>
@@ -540,17 +594,17 @@
                       type="number"
                       step="30"
                       min="180"
-                      max="1800"
+                      max="28800"
                       class="input input-bordered input-sm"
                       :class="validationErrors.cooldown ? 'input-error' : ''"
                       x-model.number="params.cooldown"
-                      @input="validationErrors.cooldown = null"
+                      @input="validationErrors.cooldown = null; validationErrors.maxOff = null"
                     />
                     <div class="label">
                       <span
                         class="label-text-alt"
                         :class="validationErrors.cooldown ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.cooldown || '180 – 1800 s, ≥ Min off time'"
+                        x-text="validationErrors.cooldown || 'Min off ≤ Cooldown ≤ Max off'"
                       ></span>
                     </div>
                   </label>

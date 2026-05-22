@@ -13,6 +13,7 @@ const CHAR_UUID = {
   AMB_START: "6e657665-7269-6e61-8000-000000000019",
   SLOPE_STOP: "6e657665-7269-6e61-8000-00000000001a",
   MIN_ON: "6e657665-7269-6e61-8000-00000000001b",
+  MAX_OFF: "6e657665-7269-6e61-8000-00000000001c",
   // Status blob
   STATUS_BLOB: "6e657665-7269-6e61-8000-000000000020",
   // History
@@ -50,7 +51,8 @@ function neverina() {
       tempStop: 0.0,
       tempStart: 6.0,
       minOff: 300,
-      maxRun: 3000,
+      maxOn: 3000,
+      maxOff: 1200,
       cooldown: 600,
       tempInt: 10,
       ambOffset: 0.0,
@@ -70,6 +72,9 @@ function neverina() {
       errors: null, // uint8 bitmask (null = unknown, 0 = OK)
       uptime: null, // uint32 seconds since boot
       controlMode: 0, // 0=simple 1=advanced
+      ambFloorEma: null,
+      tempStopTarget: null,
+      gap: null,
     },
 
     // ── Time sync anchor (set on each connect) ─────────────────
@@ -216,7 +221,8 @@ function neverina() {
         this.params.tempStop = +(await rf(this._chars.TEMP_STOP)).toFixed(1);
         this.params.tempStart = +(await rf(this._chars.TEMP_START)).toFixed(1);
         this.params.minOff = await ru(this._chars.MIN_OFF);
-        this.params.maxRun = await ru(this._chars.MAX_RUN);
+        this.params.maxOn = await ru(this._chars.MAX_RUN);
+        this.params.maxOff = await ru(this._chars.MAX_OFF);
         this.params.cooldown = await ru(this._chars.COOLDOWN);
         this.params.tempInt = await ru(this._chars.TEMP_INT);
         this.params.ambOffset = +(await rf(this._chars.AMB_OFFSET)).toFixed(1);
@@ -235,7 +241,7 @@ function neverina() {
     _parseStatusBlob(dv) {
       if (!dv || dv.byteLength < 24) return;
       const version = dv.getUint8(0);
-      if (version !== 1) {
+      if (version !== 1 && version !== 2) {
         console.warn("Unknown STATUS_BLOB version:", version);
         return;
       }
@@ -250,17 +256,33 @@ function neverina() {
       this.status.uptime = dv.getUint32(18, true);
       this.status.errors = dv.getUint8(22);
       this.status.controlMode = dv.getUint8(23);
+      if (version >= 2 && dv.byteLength >= 36) {
+        const floorVal = dv.getFloat32(24, true);
+        this.status.ambFloorEma = this.isValidTemp(floorVal) ? floorVal : null;
+        const stopTargetVal = dv.getFloat32(28, true);
+        this.status.tempStopTarget = this.isValidTemp(stopTargetVal) ? stopTargetVal : null;
+        const gapVal = dv.getFloat32(32, true);
+        this.status.gap = Number.isFinite(gapVal) ? gapVal : null;
+      } else {
+        this.status.ambFloorEma = null;
+        this.status.tempStopTarget = null;
+        this.status.gap = null;
+      }
     },
 
     _validateParams() {
       const e = {};
       if (this.params.minOff < 180) e.minOff = "Minimum 180 s";
       if (this.params.minOff > 600) e.minOff = "Maximum 600 s";
-      if (this.params.maxRun < 600) e.maxRun = "Minimum 10 min (600 s)";
-      if (this.params.maxRun > 7200) e.maxRun = "Maximum 7200 s";
+      if (this.params.maxOn < 600) e.maxOn = "Minimum 10 min (600 s)";
+      if (this.params.maxOn > 7200) e.maxOn = "Maximum 7200 s";
+      if (this.params.maxOff < 180) e.maxOff = "Minimum 180 s";
+      if (this.params.maxOff > 28800) e.maxOff = "Maximum 28800 s (8 h)";
       if (this.params.cooldown < 180) e.cooldown = "Minimum 180 s";
-      if (this.params.cooldown > 1800) e.cooldown = "Maximum 1800 s";
-      if (!e.cooldown && this.params.cooldown < this.params.minOff) e.cooldown = "Must be ≥ Min off time";
+      if (this.params.cooldown > 28800) e.cooldown = "Maximum 28800 s";
+      if (this.params.minOff > this.params.cooldown || this.params.cooldown > this.params.maxOff) {
+        e.cooldown = "Min off ≤ Cooldown ≤ Max off required";
+      }
       if (this.params.tempInt < 5) e.tempInt = "Minimum 5 s";
       if (this.params.tempInt > 60) e.tempInt = "Maximum 60 s";
       if (this.params.ambOffset < -20 || this.params.ambOffset > 20) e.ambOffset = "Range −20 to 20 °C";
@@ -297,7 +319,8 @@ function neverina() {
         await wf(this._chars.TEMP_STOP, this.params.tempStop);
         await wf(this._chars.TEMP_START, this.params.tempStart);
         await wu(this._chars.MIN_OFF, this.params.minOff);
-        await wu(this._chars.MAX_RUN, this.params.maxRun);
+        await wu(this._chars.MAX_RUN, this.params.maxOn);
+        await wu(this._chars.MAX_OFF, this.params.maxOff);
         await wu(this._chars.COOLDOWN, this.params.cooldown);
         await wu(this._chars.TEMP_INT, this.params.tempInt);
         await wf(this._chars.AMB_OFFSET, this.params.ambOffset);

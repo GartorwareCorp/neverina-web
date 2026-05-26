@@ -90,8 +90,10 @@
         <div x-show="activeTab === 'data'" class="space-y-4">
           <!-- Status cards -->
           <div class="flex flex-wrap gap-3 w-full">
-            <div class="card shadow col-span-3 w-full flex-auto"
-              :class="errorList().length > 0 ? 'bg-error/10' : 'bg-success/10'">
+            <div
+              class="card shadow col-span-3 w-full flex-auto"
+              :class="errorList().length > 0 ? 'bg-error/10' : 'bg-success/10'"
+            >
               <div class="card-body p-4 flex-row items-center gap-3">
                 <span class="text-xl" x-text="errorList().length > 0 ? '✖' : '✔'"></span>
                 <div>
@@ -111,25 +113,32 @@
               </div>
             </div>
 
-            <divc class="flex flex-wrap gap-3 w-full">
+            <div class="flex flex-wrap gap-3 w-full">
               <div class="card bg-base-100 shadow w-1/2 flex-1">
                 <div class="card-body p-4 items-center text-center">
                   <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Active</p>
                   <p class="text-2xl font-bold mt-1" x-text="formatDuration(status.uptime)"></p>
-                  </div>
-                  </div>
+                </div>
+              </div>
 
-              <div class="card bg-base-100 shadow col-span-2  w-1/2 flex-1">
+              <div class="card bg-base-100 shadow col-span-2 w-1/2 flex-1">
                 <div class="card-body p-4 items-center text-center">
                   <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Status</p>
                   <div class="flex flex-col items-center justify-center gap-2 mt-1">
                     <div class="flex items-center gap-2">
-                      <span class="badge badge-lg font-semibold" :class="stateBadgeClass()" x-text="stateLabel()"></span>
-                      <span class="badge badge-sm badge-outline" x-text="status.controlMode === 1 ? 'ADV' : 'STD'"></span>
-                      </div>
+                      <span
+                        class="badge badge-lg font-semibold"
+                        :class="stateBadgeClass()"
+                        x-text="stateLabel()"
+                      ></span>
+                      <span
+                        class="badge badge-sm badge-outline"
+                        x-text="status.controlMode === 2 ? 'AUTO' : status.controlMode === 1 ? 'ADV' : 'STD'"
+                      ></span>
+                    </div>
                     <p class="text-xl font-bold" x-text="formatDuration(status.stateTime)"></p>
                   </div>
-                  </div>
+                </div>
               </div>
             </div>
 
@@ -137,10 +146,7 @@
               <div class="card bg-base-100 shadow w-1/3 flex-1">
                 <div class="card-body p-4 items-center text-center">
                   <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temperature (°C)</p>
-                  <p
-                    class="text-2xl font-bold mt-1"
-                    x-text="status.temp !== null ? status.temp.toFixed(1) : '—'"
-                  ></p>
+                  <p class="text-2xl font-bold mt-1" x-text="status.temp !== null ? status.temp.toFixed(1) : '—'"></p>
                 </div>
               </div>
 
@@ -193,6 +199,57 @@
                         x-text="status.tempStopTarget !== null ? status.tempStopTarget.toFixed(1) + ' °C' : '—'"
                       ></p>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template x-if="status.controlMode === 2">
+              <div class="card bg-base-100 shadow col-span-3 w-full flex-auto">
+                <div class="card-body p-4">
+                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-2">
+                    Automatic control (thermal model)
+                  </p>
+                  <div class="grid grid-cols-4 gap-4 text-center">
+                    <div>
+                      <p class="text-xs text-base-content/50">Start Target</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.autoStartC !== null ? status.autoStartC.toFixed(1) + ' °C' : '—'"
+                      ></p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-base-content/50">Stop Target</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.autoStopC !== null ? status.autoStopC.toFixed(1) + ' °C' : '—'"
+                      ></p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-base-content/50">Thermal leak</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.modelQext !== null ? status.modelQext.toFixed(2) + ' °C/min' : '—'"
+                      ></p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-base-content/50">Air inertia</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.modelKappa !== null ? (1/status.modelKappa).toFixed(0) + ' min' : '—'"
+                      ></p>
+                    </div>
+                    <div>
+                      <p class="text-xs text-base-content/50">Model</p>
+                      <p
+                        class="text-lg font-semibold"
+                        x-text="status.modelConverged ? '✓' : 'Learning…'"
+                        :class="status.modelConverged ? 'text-success' : 'text-warning'"
+                      ></p>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-2 gap-2 text-center mt-2 text-xs text-base-content/40">
+                    <span x-text="'Qext=' + (status.modelQext !== null ? status.modelQext.toFixed(4) : '—')"></span>
+                    <span x-text="'κ=' + (status.modelKappa !== null ? status.modelKappa.toFixed(4) : '—')"></span>
                   </div>
                 </div>
               </div>
@@ -383,28 +440,39 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label class="form-control">
                     <div class="label"><span class="label-text">Ambient offset (°C)</span></div>
-                    <input type="number" step="0.1" class="input input-bordered input-sm"
-                      :class="validationErrors.ambOffset ? 'input-error' : ''" x-model.number="params.ambOffset"
-                      @input="validationErrors.ambOffset = null" />
+                    <input
+                      type="number"
+                      step="0.1"
+                      class="input input-bordered input-sm"
+                      :class="validationErrors.ambOffset ? 'input-error' : ''"
+                      x-model.number="params.ambOffset"
+                      @input="validationErrors.ambOffset = null"
+                    />
                     <div class="label">
-                      <span class="label-text-alt" :class="validationErrors.ambOffset ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.ambOffset || 'SHT30 calibration: −20 to +20 °C'"></span>
+                      <span
+                        class="label-text-alt"
+                        :class="validationErrors.ambOffset ? 'text-error' : 'text-base-content/40'"
+                        x-text="validationErrors.ambOffset || 'SHT30 calibration: −20 to +20 °C'"
+                      ></span>
                     </div>
                   </label>
-              
+
                   <label class="form-control">
                     <div class="label"><span class="label-text">Mode</span></div>
                     <select class="select select-bordered select-sm" x-model.number="params.controlMode">
                       <option value="0">Simple</option>
                       <option value="1">Advanced (dual sensor)</option>
+                      <option value="2">Automatic (thermal model)</option>
                     </select>
                     <div class="label">
-                      <span class="label-text-alt text-base-content/40">Simple: probe only. Advanced: probe + ambient</span>
+                      <span class="label-text-alt text-base-content/40"
+                        >Simple: probe only. Advanced: probe + ambient (adaptive). Automatic: self-learning</span
+                      >
                     </div>
                   </label>
                 </div>
               </div>
-              
+
               <div class="divider my-0"></div>
 
               <!-- Temperature thresholds -->
@@ -487,8 +555,6 @@
               </template>
 
               <div class="divider my-0"></div>
-
-            
 
               <!-- Timings -->
               <div>

@@ -71,10 +71,16 @@ function neverina() {
       stateTime: null, // uint32 seconds in current state
       errors: null, // uint8 bitmask (null = unknown, 0 = OK)
       uptime: null, // uint32 seconds since boot
-      controlMode: 0, // 0=simple 1=advanced
+      controlMode: 0, // 0=simple 1=advanced 2=automatic
       ambFloorEma: null,
       tempStopTarget: null,
       gap: null,
+      // Automatic mode (v3)
+      modelQext: null,
+      modelKappa: null,
+      autoStartC: null,
+      autoStopC: null,
+      modelConverged: false,
     },
 
     // ── Time sync anchor (set on each connect) ─────────────────
@@ -241,7 +247,7 @@ function neverina() {
     _parseStatusBlob(dv) {
       if (!dv || dv.byteLength < 24) return;
       const version = dv.getUint8(0);
-      if (version !== 1 && version !== 2) {
+      if (version < 1 || version > 3) {
         console.warn("Unknown STATUS_BLOB version:", version);
         return;
       }
@@ -267,6 +273,23 @@ function neverina() {
         this.status.ambFloorEma = null;
         this.status.tempStopTarget = null;
         this.status.gap = null;
+      }
+      if (version >= 3 && dv.byteLength >= 53) {
+        const qext = dv.getFloat32(36, true);
+        this.status.modelQext = Number.isFinite(qext) ? qext : null;
+        const kappa = dv.getFloat32(40, true);
+        this.status.modelKappa = Number.isFinite(kappa) ? kappa : null;
+        const autoStart = dv.getFloat32(44, true);
+        this.status.autoStartC = Number.isFinite(autoStart) ? autoStart : null;
+        const autoStop = dv.getFloat32(48, true);
+        this.status.autoStopC = Number.isFinite(autoStop) ? autoStop : null;
+        this.status.modelConverged = dv.getUint8(52) !== 0;
+      } else {
+        this.status.modelQext = null;
+        this.status.modelKappa = null;
+        this.status.autoStartC = null;
+        this.status.autoStopC = null;
+        this.status.modelConverged = false;
       }
     },
 
@@ -928,8 +951,7 @@ function neverina() {
         if (curNonOnStart !== null) nonOnSegs.push({ start: curNonOnStart, end: xMax });
 
         const cycleCount = cycleOnMs.length;
-        const avgOnSec =
-          cycleCount > 0 ? cycleOnMs.reduce((a, b) => a + b, 0) / cycleCount / 1000 : null;
+        const avgOnSec = cycleCount > 0 ? cycleOnMs.reduce((a, b) => a + b, 0) / cycleCount / 1000 : null;
         const avgOffSec =
           interCycleOffMs.length > 0
             ? interCycleOffMs.reduce((a, b) => a + b, 0) / interCycleOffMs.length / 1000

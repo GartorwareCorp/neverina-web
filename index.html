@@ -505,8 +505,8 @@
                 </div>
               </div>
 
-              <!-- Advanced mode settings (visible only when mode=1) -->
-              <template x-if="params.controlMode === 1">
+              <!-- Advanced mode settings (visible only when mode=1 or mode=2) -->
+              <template x-if="params.controlMode === 1 || params.controlMode === 2">
                 <div>
                   <div class="divider my-0"></div>
                   <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Advanced mode</p>
@@ -527,12 +527,12 @@
                         <span
                           class="label-text-alt"
                           :class="validationErrors.effStop ? 'text-error' : 'text-base-content/40'"
-                          x-text="validationErrors.effStop || 'Comfort target for ambTemp (gap reference). Range \u221210 to 15 \u00b0C'"
+                          x-text="validationErrors.effStop || 'Ambient temperature target. Range \u221210 to 15 \u00b0C'"
                         ></span>
                       </div>
                     </label>
 
-                    <label class="form-control">
+                    <label class="form-control" x-show="params.controlMode === 1">
                       <div class="label"><span class="label-text">Slope stop (°C/min)</span></div>
                       <input
                         type="number"

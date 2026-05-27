@@ -230,8 +230,8 @@
                       ></p>
                       <p
                         class="text-xs text-base-content/40"
-                        x-show="status.autoStopC !== null"
-                        x-text="'(' + Math.max(status.autoStopC, params.tempStop).toFixed(1) + ' °C limit)'"
+                        x-show="status.tempStopTarget !== null"
+                        x-text="'(' + status.tempStopTarget.toFixed(1) + ' °C limit)'"
                       ></p>
                     </div>
                     <div>

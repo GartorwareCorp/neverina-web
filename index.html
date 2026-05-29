@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="corporate">
+<html lang="es" data-theme="corporate">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -39,12 +39,12 @@
     <script src="app.js"></script>
   </head>
   <body class="min-h-screen bg-base-200">
-    <div x-data="{ ...neverina(), activeTab: 'data' }" x-init="init()" class="max-w-2xl mx-auto p-4 space-y-4">
+    <div x-data="{ ...neverina(), activeTab: 'data', showModelInfo: false }" x-init="init()" class="max-w-2xl mx-auto p-4 space-y-4">
       <!-- ── Header ─────────────────────────────────────────────────── -->
       <div class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold">Neverina</h1>
-          <p class="text-sm text-base-content/60" x-text="deviceName ? deviceName : 'Not connected'"></p>
+          <p class="text-sm text-base-content/60" x-text="deviceName ? deviceName : 'Sin conectar'"></p>
         </div>
         <button
           class="btn"
@@ -53,7 +53,7 @@
           @click="connected ? disconnect() : connect()"
         >
           <span x-show="connecting" class="loading loading-spinner loading-sm"></span>
-          <span x-text="connecting ? 'Connecting…' : connected ? 'Disconnect' : 'Connect'"></span>
+          <span x-text="connecting ? 'Conectando…' : connected ? 'Desconectar' : 'Conectar'"></span>
         </button>
       </div>
 
@@ -61,8 +61,8 @@
       <div class="hero py-16" x-show="!connected">
         <div class="hero-content text-center">
           <div>
-            <p class="text-base-content/40">Connect via Bluetooth to configure the device and monitor status.</p>
-            <p class="text-xs text-base-content/30 mt-2">Requires Chrome on Desktop or Android.</p>
+            <p class="text-base-content/40">Conecta por Bluetooth para configurar el dispositivo y ver su estado.</p>
+            <p class="text-xs text-base-content/30 mt-2">Requiere Chrome en ordenador o Android.</p>
           </div>
         </div>
       </div>
@@ -71,7 +71,7 @@
       <div x-show="connected" class="space-y-4">
         <div role="tablist" class="tabs tabs-boxed">
           <button role="tab" class="tab" :class="activeTab === 'data' && 'tab-active'" @click="activeTab = 'data'">
-            Data
+            Datos
           </button>
           <button
             role="tab"
@@ -79,7 +79,7 @@
             :class="activeTab === 'parameters' && 'tab-active'"
             @click="activeTab = 'parameters'"
           >
-            Parameters
+            Parametros
           </button>
           <button role="tab" class="tab" :class="activeTab === 'ota' && 'tab-active'" @click="activeTab = 'ota'">
             OTA
@@ -100,7 +100,7 @@
                   <p
                     class="text-xs font-semibold uppercase tracking-wide"
                     :class="errorList().length > 0 ? 'text-error' : 'text-success'"
-                    x-text="errorList().length > 0 ? 'Device errors' : 'All systems OK'"
+                    x-text="errorList().length > 0 ? 'Errores del dispositivo' : 'Todo correcto'"
                   ></p>
                   <template x-if="errorList().length > 0">
                     <ul class="mt-1 space-y-0.5">
@@ -116,14 +116,14 @@
             <div class="flex flex-wrap gap-3 w-full">
               <div class="card bg-base-100 shadow w-1/2 flex-1">
                 <div class="card-body p-4 items-center text-center">
-                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Active</p>
+                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Activo</p>
                   <p class="text-2xl font-bold mt-1" x-text="formatDuration(status.uptime)"></p>
                 </div>
               </div>
 
               <div class="card bg-base-100 shadow col-span-2 w-1/2 flex-1">
                 <div class="card-body p-4 items-center text-center">
-                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Status</p>
+                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Estado</p>
                   <div class="flex flex-col items-center justify-center gap-2 mt-1">
                     <div class="flex items-center gap-2">
                       <span
@@ -145,14 +145,14 @@
             <div class="flex flex-wrap gap-3 w-full">
               <div class="card bg-base-100 shadow w-1/3 flex-1">
                 <div class="card-body p-4 items-center text-center">
-                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temperature (°C)</p>
+                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temperatura (°C)</p>
                   <p class="text-2xl font-bold mt-1" x-text="status.temp !== null ? status.temp.toFixed(1) : '—'"></p>
                 </div>
               </div>
 
               <div class="card bg-base-100 shadow w-1/3 flex-1">
                 <div class="card-body p-4 items-center text-center">
-                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Ambient temp (°C)</p>
+                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Temp. ambiente (°C)</p>
                   <p
                     class="text-2xl font-bold mt-1"
                     x-text="status.ambTemp !== null ? status.ambTemp.toFixed(1) : '—'"
@@ -162,7 +162,7 @@
 
               <div class="card bg-base-100 shadow w-1/3 flex-1">
                 <div class="card-body p-4 items-center text-center">
-                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Ambient hum (%)</p>
+                  <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide">Humedad ambiente (%)</p>
                   <p
                     class="text-2xl font-bold mt-1"
                     x-text="status.humidity !== null ? status.humidity.toFixed(0) : '—'"
@@ -175,7 +175,7 @@
               <div class="card bg-base-100 shadow col-span-3 w-full flex-auto">
                 <div class="card-body p-4">
                   <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-2">
-                    Advanced control
+                    Control avanzado
                   </p>
                   <div class="grid grid-cols-3 gap-4 text-center">
                     <div>
@@ -193,7 +193,7 @@
                       ></p>
                     </div>
                     <div>
-                      <p class="text-xs text-base-content/50">Temp Stop Target</p>
+                      <p class="text-xs text-base-content/50">Objetivo de parada</p>
                       <p
                         class="text-lg font-semibold"
                         x-text="status.tempStopTarget !== null ? status.tempStopTarget.toFixed(1) + ' °C' : '—'"
@@ -203,65 +203,102 @@
                 </div>
               </div>
             </template>
-            <template x-if="status.controlMode === 2">
+            <template x-if="status.controlMode === 2 || true">
               <div class="card bg-base-100 shadow col-span-3 w-full flex-auto">
                 <div class="card-body p-4">
                   <p class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-2 flex items-center">
-                    Automatic control (thermal model)
+                    Control por modelo termico
                     <span
                       class="badge badge-sm badge-outline ml-auto"
-                      x-text="status.modelConverged ? 'Converged' : 'Learning'"
+                      x-text="status.modelConverged ? 'Convergido' : 'Aprendiendo'"
                       :class="status.modelConverged ? 'text-success' : 'text-warning'"
                     ></span>
                   </p>
                   <div class="grid grid-cols-4 gap-4 text-center">
                     <div>
-                      <p class="text-xs text-base-content/50">Start Target</p>
+                      <p class="text-xs text-base-content/50">Arranque</p>
+                      <p class="text-lg font-semibold">
+                        <template x-if="status.autoStartC !== null">
+                          <span>
+                            <span x-text="status.autoStartC.toFixed(1)"></span>
+                            <span class="text-sm font-normal text-base-content/60"> °C</span>
+                          </span>
+                        </template>
+                        <template x-if="status.autoStartC === null"><span>—</span></template>
+                      </p>
                       <p
-                        class="text-lg font-semibold"
-                        x-text="status.autoStartC !== null ? status.autoStartC.toFixed(1) + ' °C' : '—'"
+                        class="text-xs text-base-content/45"
+                        x-show="params.tempStart !== null"
+                        x-text="'(' + (params.tempStart !== null ? params.tempStart.toFixed(1) : '—') + ' °C)'"
                       ></p>
                     </div>
                     <div>
-                      <p class="text-xs text-base-content/50">Stop Target</p>
+                      <p class="text-xs text-base-content/50">Parada</p>
+                      <p class="text-lg font-semibold">
+                        <template x-if="status.autoStopC !== null">
+                          <span>
+                            <span x-text="status.autoStopC.toFixed(1)"></span>
+                            <span class="text-sm font-normal text-base-content/60"> °C</span>
+                          </span>
+                        </template>
+                        <template x-if="status.autoStopC === null"><span>—</span></template>
+                      </p>
                       <p
-                        class="text-lg font-semibold"
-                        x-text="status.autoStopC !== null ? status.autoStopC.toFixed(1) + ' °C' : '—'"
-                      ></p>
-                      <p
-                        class="text-xs text-base-content/40"
-                        x-show="status.tempStopTarget !== null"
-                        x-text="'(' + status.tempStopTarget.toFixed(1) + ' °C limit)'"
+                        class="text-xs text-base-content/45"
+                        x-show="status.tempStopTarget !== null || params.tempStop !== null"
+                        x-text="'(' + (status.tempStopTarget !== null ? status.tempStopTarget.toFixed(1) : '—') + ' / ' + (params.tempStop !== null ? params.tempStop.toFixed(1) : '—') + ' °C)'"
                       ></p>
                     </div>
                     <div>
-                      <p class="text-xs text-base-content/50">Thermal leak</p>
-                      <p
-                        class="text-lg font-semibold"
-                        x-text="status.modelQext !== null ? status.modelQext.toFixed(2) + ' °C/min' : '—'"
-                      ></p>
+                      <p class="text-xs text-base-content/50">Fuga termica</p>
+                      <p class="text-lg font-semibold">
+                        <template x-if="status.modelQext !== null">
+                          <span>
+                            <span x-text="status.modelQext.toFixed(2)"></span>
+                            <span class="text-sm font-normal text-base-content/60"> °C/min</span>
+                          </span>
+                        </template>
+                        <template x-if="status.modelQext === null"><span>—</span></template>
+                      </p>
                       <p
                         class="text-xs text-base-content/40"
                         x-text="'Qext=' + (status.modelQext !== null ? status.modelQext.toFixed(4) : '—')"
                       ></p>
                     </div>
                     <div>
-                      <p class="text-xs text-base-content/50">Air inertia</p>
-                      <p
-                        class="text-lg font-semibold"
-                        x-text="status.modelKappa !== null ? (1/status.modelKappa).toFixed(0) + ' min' : '—'"
-                      ></p>
+                      <p class="text-xs text-base-content/50">Inercia del aire</p>
+                      <p class="text-lg font-semibold">
+                        <template x-if="status.modelKappa !== null">
+                          <span>
+                            <span x-text="(1/status.modelKappa).toFixed(0)"></span>
+                            <span class="text-sm font-normal text-base-content/60"> min</span>
+                          </span>
+                        </template>
+                        <template x-if="status.modelKappa === null"><span>—</span></template>
+                      </p>
                       <p
                         class="text-xs text-base-content/40"
                         x-text="'κ=' + (status.modelKappa !== null ? status.modelKappa.toFixed(4) : '—')"
                       ></p>
                     </div>
                   </div>
-
-                  <div class="grid grid-cols-2 gap-2 text-center mt-2 text-xs text-base-content/40">
-                    <span x-text="'Qext=' + (status.modelQext !== null ? status.modelQext.toFixed(4) : '—')"></span>
-                    <span x-text="'κ=' + (status.modelKappa !== null ? status.modelKappa.toFixed(4) : '—')"></span>
+                  <div class="mt-3 flex items-center justify-end">
+                    <button
+                      class="btn btn-xs btn-ghost"
+                      @click="showModelInfo = !showModelInfo"
+                      x-text="showModelInfo ? 'Ocultar info' : 'INFO'"
+                    ></button>
                   </div>
+                  <p x-show="showModelInfo" x-transition class="mt-2 text-xs leading-relaxed text-base-content/60">
+                    El modelo estima la dinamica termica real de la nevera.
+                    <strong>Qext</strong> representa la entrada de
+                    calor desde el exterior (cuanto sube la temperatura por minuto), y <strong>kappa</strong> la rapidez de
+                    respuesta termica del aire interior (inercia): por eso tambien se muestra <strong>1/kappa</strong> en
+                    minutos. Con esos parametros calcula una parada teorica: <strong>Tstop_model = Tobjetivo - 2*Qext/kappa</strong>
+                    (Tobjetivo = parada efectiva). La parada efectiva nunca baja del parametro de seguridad de
+                    Parametros: <strong>Tstop_final = max(Tstop_model, tempStopTarget, tempStopC)</strong>. Relacion: si sube Qext o baja kappa, la nevera se preenfria mas (Tstop baja); si baja Qext o
+                    sube kappa, Tstop se acerca a Tobjetivo.
+                  </p>
                 </div>
               </div>
             </template>
@@ -271,7 +308,7 @@
           <div class="card bg-base-100 shadow">
             <div class="card-body space-y-3">
               <div class="flex items-center justify-between">
-                <h2 class="card-title text-base">History</h2>
+                <h2 class="card-title text-base">Historial</h2>
                 <div class="flex items-center gap-2">
                   <select
                     class="select select-bordered select-sm"
@@ -284,7 +321,7 @@
                   </select>
                   <button class="btn btn-sm btn-primary" @click="loadHistory()" :disabled="histLoading">
                     <span x-show="histLoading" class="loading loading-spinner loading-xs"></span>
-                    <span x-text="histLoading ? 'Loading…' : 'Load'"></span>
+                    <span x-text="histLoading ? 'Cargando…' : 'Cargar'"></span>
                   </button>
                 </div>
               </div>
@@ -304,7 +341,7 @@
                   ></p>
                 </div>
                 <div class="rounded-lg bg-base-200 px-3 py-2">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">CoolDown</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">ENFRIAMIENTO</p>
                   <p
                     class="text-sm font-semibold"
                     x-text="formatDuration(Math.round(histStateTotals.cooldownMs / 1000))"
@@ -315,7 +352,7 @@
                   ></p>
                 </div>
                 <div class="rounded-lg bg-base-200 px-3 py-2">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">ON</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">ENCENDIDO</p>
                   <p class="text-sm font-semibold" x-text="formatDuration(Math.round(histStateTotals.onMs / 1000))"></p>
                   <p
                     class="text-xs text-base-content/60"
@@ -329,14 +366,14 @@
                 x-show="histTempStats.min !== null || histAmbStats.min !== null"
               >
                 <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histTempStats.min !== null">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Fridge temp</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Temp. nevera</p>
                   <div class="flex justify-between mt-1">
                     <div class="text-center">
                       <p class="text-[10px] text-base-content/40 uppercase">Min</p>
                       <p class="text-sm font-semibold" x-text="histTempStats.min?.toFixed(1) + ' °C'"></p>
                     </div>
                     <div class="text-center">
-                      <p class="text-[10px] text-base-content/40 uppercase">Avg</p>
+                      <p class="text-[10px] text-base-content/40 uppercase">Media</p>
                       <p class="text-sm font-semibold" x-text="histTempStats.avg?.toFixed(1) + ' °C'"></p>
                     </div>
                     <div class="text-center">
@@ -346,14 +383,14 @@
                   </div>
                 </div>
                 <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histAmbStats.min !== null">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Ambient temp</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Temp. ambiente</p>
                   <div class="flex justify-between mt-1">
                     <div class="text-center">
                       <p class="text-[10px] text-base-content/40 uppercase">Min</p>
                       <p class="text-sm font-semibold" x-text="histAmbStats.min?.toFixed(1) + ' °C'"></p>
                     </div>
                     <div class="text-center">
-                      <p class="text-[10px] text-base-content/40 uppercase">Avg</p>
+                      <p class="text-[10px] text-base-content/40 uppercase">Media</p>
                       <p class="text-sm font-semibold" x-text="histAmbStats.avg?.toFixed(1) + ' °C'"></p>
                     </div>
                     <div class="text-center">
@@ -370,7 +407,7 @@
                 x-show="histCycleStats.count !== null && histCycleStats.count > 0"
               >
                 <div class="rounded-lg bg-base-200 px-3 py-2">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Cycles</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Ciclos</p>
                   <p class="text-sm font-semibold" x-text="histCycleStats.count"></p>
                   <p
                     class="text-xs text-base-content/60"
@@ -379,27 +416,27 @@
                 </div>
 
                 <div class="rounded-lg bg-base-200 px-3 py-2">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Duty cycle</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Ciclo de trabajo</p>
                   <p class="text-sm font-semibold" x-text="formatPercent(histStatePercent(histStateTotals.onMs))"></p>
-                  <p class="text-xs text-base-content/60">compressor ON</p>
+                  <p class="text-xs text-base-content/60">compresor ON</p>
                 </div>
 
                 <div class="rounded-lg bg-base-200 px-3 py-2">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg ON</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Media ON</p>
                   <p
                     class="text-sm font-semibold"
                     x-text="histCycleStats.avgOnSec !== null ? formatDuration(Math.round(histCycleStats.avgOnSec)) : '—'"
                   ></p>
-                  <p class="text-xs text-base-content/60">per cycle</p>
+                  <p class="text-xs text-base-content/60">por ciclo</p>
                 </div>
 
                 <div class="rounded-lg bg-base-200 px-3 py-2">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Avg OFF</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Media OFF</p>
                   <p
                     class="text-sm font-semibold"
                     x-text="histCycleStats.avgOffSec !== null ? formatDuration(Math.round(histCycleStats.avgOffSec)) : '—'"
                   ></p>
-                  <p class="text-xs text-base-content/60">between cycles</p>
+                  <p class="text-xs text-base-content/60">entre ciclos</p>
                 </div>
               </div>
 
@@ -409,7 +446,7 @@
                 x-show="histThermalStats.coolingRateCPerMin !== null || histThermalStats.heatLeakRateCPerMin !== null"
               >
                 <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.coolingRateCPerMin !== null">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Cooling</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Enfriamiento</p>
                   <p
                     class="text-sm font-semibold"
                     x-text="(histThermalStats.coolingRateCPerMin >= 0 ? '+' : '') + histThermalStats.coolingRateCPerMin.toFixed(2) + ' °C/min'"
@@ -417,7 +454,7 @@
                   <p class="text-xs text-base-content/60">comp ON</p>
                 </div>
                 <div class="rounded-lg bg-base-200 px-3 py-2" x-show="histThermalStats.heatLeakRateCPerMin !== null">
-                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Heat leak</p>
+                  <p class="text-xs text-base-content/60 uppercase tracking-wide">Fuga termica</p>
                   <p
                     class="text-sm font-semibold"
                     x-text="(histThermalStats.heatLeakRateCPerMin >= 0 ? '+' : '') + histThermalStats.heatLeakRateCPerMin.toFixed(2) + ' °C/min'"
@@ -434,23 +471,23 @@
           <div class="card bg-base-100 shadow">
             <div class="card-body space-y-5">
               <div class="flex items-center justify-between">
-                <h2 class="card-title">Parameters</h2>
+                <h2 class="card-title">Parametros</h2>
                 <div class="flex items-center gap-2">
                   <span x-show="saveError" class="text-xs text-error" x-text="saveError"></span>
-                  <button class="btn btn-sm btn-ghost" @click="readAll()" :disabled="saving">Read</button>
+                  <button class="btn btn-sm btn-ghost" @click="readAll()" :disabled="saving">Leer</button>
                   <button class="btn btn-sm btn-primary" @click="saveAll()" :disabled="saving">
                     <span x-show="saving" class="loading loading-spinner loading-xs"></span>
-                    <span x-text="saving ? 'Saving…' : 'Save all'"></span>
+                    <span x-text="saving ? 'Guardando…' : 'Guardar'"></span>
                   </button>
                 </div>
               </div>
 
               <!-- Control mode -->
               <div>
-                <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Control mode</p>
+                <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Modo de control</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Ambient offset (°C)</span></div>
+                    <div class="label"><span class="label-text">Offset ambiente (°C)</span></div>
                     <input
                       type="number"
                       step="0.1"
@@ -463,21 +500,21 @@
                       <span
                         class="label-text-alt"
                         :class="validationErrors.ambOffset ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.ambOffset || 'SHT30 calibration: −20 to +20 °C'"
+                        x-text="validationErrors.ambOffset || 'Calibracion SHT30: −20 a +20 °C'"
                       ></span>
                     </div>
                   </label>
 
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Mode</span></div>
+                    <div class="label"><span class="label-text">Modo</span></div>
                     <select class="select select-bordered select-sm" x-model.number="params.controlMode">
                       <option value="0">Simple</option>
-                      <option value="1">Advanced (dual sensor)</option>
-                      <option value="2">Automatic (thermal model)</option>
+                      <option value="1">Avanzado (sensor dual)</option>
+                      <option value="2">Automatico (modelo termico)</option>
                     </select>
                     <div class="label">
                       <span class="label-text-alt text-base-content/40"
-                        >Simple: probe only. Advanced: probe + ambient (adaptive). Automatic: self-learning</span
+                        >Simple: solo sonda. Avanzado: sonda + ambiente (adaptativo). Automatico: autoaprendizaje</span
                       >
                     </div>
                   </label>
@@ -489,29 +526,29 @@
               <!-- Temperature thresholds -->
               <div>
                 <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">
-                  Temperature thresholds
+                  Umbrales de temperatura
                 </p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Stop at (°C)</span></div>
+                    <div class="label"><span class="label-text">Parar en (°C)</span></div>
                     <input
                       type="number"
                       step="0.5"
                       class="input input-bordered input-sm"
                       x-model.number="params.tempStop"
                     />
-                    <div class="label"><span class="label-text-alt text-base-content/40">Range −18 to 50</span></div>
+                    <div class="label"><span class="label-text-alt text-base-content/40">Rango −18 a 50</span></div>
                   </label>
 
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Start at (°C)</span></div>
+                    <div class="label"><span class="label-text">Arrancar en (°C)</span></div>
                     <input
                       type="number"
                       step="0.5"
                       class="input input-bordered input-sm"
                       x-model.number="params.tempStart"
                     />
-                    <div class="label"><span class="label-text-alt text-base-content/40">Range −18 to 50</span></div>
+                    <div class="label"><span class="label-text-alt text-base-content/40">Rango −18 a 50</span></div>
                   </label>
                 </div>
               </div>
@@ -520,10 +557,10 @@
               <template x-if="params.controlMode === 1 || params.controlMode === 2">
                 <div>
                   <div class="divider my-0"></div>
-                  <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Advanced mode</p>
+                  <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Modo avanzado</p>
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <label class="form-control">
-                      <div class="label"><span class="label-text">Effective stop (°C)</span></div>
+                      <div class="label"><span class="label-text">Temperatura objetivo (°C)</span></div>
                       <input
                         type="number"
                         step="0.5"
@@ -538,13 +575,13 @@
                         <span
                           class="label-text-alt"
                           :class="validationErrors.effStop ? 'text-error' : 'text-base-content/40'"
-                          x-text="validationErrors.effStop || 'Ambient temperature target. Range \u221210 to 15 \u00b0C'"
+                          x-text="validationErrors.effStop || 'Objetivo de temperatura ambiente. Rango −10 a 15 °C'"
                         ></span>
                       </div>
                     </label>
 
                     <label class="form-control" x-show="params.controlMode === 1">
-                      <div class="label"><span class="label-text">Slope stop (°C/min)</span></div>
+                      <div class="label"><span class="label-text">Pendiente de parada (°C/min)</span></div>
                       <input
                         type="number"
                         step="0.001"
@@ -557,7 +594,7 @@
                         <span
                           class="label-text-alt"
                           :class="validationErrors.slopeStop ? 'text-error' : 'text-base-content/40'"
-                          x-text="validationErrors.slopeStop || 'Plateau threshold (−1.0 to 0.0)'"
+                          x-text="validationErrors.slopeStop || 'Umbral de meseta (−1.0 a 0.0)'"
                         ></span>
                       </div>
                     </label>
@@ -569,10 +606,10 @@
 
               <!-- Timings -->
               <div>
-                <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Timings</p>
+                <p class="text-sm font-semibold text-base-content/60 mb-3 uppercase tracking-wide">Tiempos</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Min ON time (min)</span></div>
+                    <div class="label"><span class="label-text">Tiempo minimo ON (min)</span></div>
                     <input
                       type="number"
                       step="0.5"
@@ -593,7 +630,7 @@
                   </label>
 
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Min OFF time (min)</span></div>
+                    <div class="label"><span class="label-text">Tiempo minimo OFF (min)</span></div>
                     <input
                       type="number"
                       step="0.1"
@@ -614,7 +651,7 @@
                   </label>
 
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Max ON time (min)</span></div>
+                    <div class="label"><span class="label-text">Tiempo maximo ON (min)</span></div>
                     <input
                       type="number"
                       step="1"
@@ -629,13 +666,13 @@
                       <span
                         class="label-text-alt"
                         :class="validationErrors.maxOn ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.maxOn || '10 – 120 min (2 h)'"
+                        x-text="validationErrors.maxOn || '10 – 120 min'"
                       ></span>
                     </div>
                   </label>
 
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Max OFF time (min)</span></div>
+                    <div class="label"><span class="label-text">Tiempo maximo OFF (min)</span></div>
                     <input
                       type="number"
                       step="1"
@@ -650,13 +687,13 @@
                       <span
                         class="label-text-alt"
                         :class="validationErrors.maxOff ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.maxOff || 'Default 4× Min ON. Forces restart if OFF too long'"
+                        x-text="validationErrors.maxOff || 'Min OFF - 720 min'"
                       ></span>
                     </div>
                   </label>
 
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Cooldown time (min)</span></div>
+                    <div class="label"><span class="label-text">Tiempo de enfriamiento (min)</span></div>
                     <input
                       type="number"
                       step="0.5"
@@ -671,13 +708,13 @@
                       <span
                         class="label-text-alt"
                         :class="validationErrors.cooldown ? 'text-error' : 'text-base-content/40'"
-                        x-text="validationErrors.cooldown || 'Min OFF ≤ Cooldown ≤ Max OFF'"
+                        x-text="validationErrors.cooldown || 'Min OFF ≤ Enfriamiento ≤ Max OFF'"
                       ></span>
                     </div>
                   </label>
 
                   <label class="form-control">
-                    <div class="label"><span class="label-text">Temp interval (s)</span></div>
+                    <div class="label"><span class="label-text">Intervalo temp (s)</span></div>
                     <input
                       type="number"
                       step="1"
@@ -708,13 +745,13 @@
             <div class="card-body">
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <h2 class="card-title text-base">Firmware update</h2>
+                  <h2 class="card-title text-base">Actualizacion de firmware</h2>
                   <p class="text-xs text-base-content/50 mt-0.5">
-                    The device will disconnect, stop the thermostat, and wait for a firmware upload at
+                    El dispositivo se desconectara, detendra el termostato y esperara una carga de firmware en
                     <code>http://&lt;device-ip&gt;/update</code>.
                   </p>
                 </div>
-                <button class="btn btn-error btn-outline btn-sm shrink-0" @click="triggerOta()">Enter OTA mode</button>
+                <button class="btn btn-error btn-outline btn-sm shrink-0" @click="triggerOta()">Entrar en modo OTA</button>
               </div>
             </div>
           </div>
@@ -725,8 +762,8 @@
     <!-- Update toast -->
     <div id="update-toast" class="toast toast-end z-50 hidden">
       <div class="alert alert-info shadow-lg">
-        <span>New version available</span>
-        <button class="btn btn-sm btn-primary" id="update-btn">Reload</button>
+        <span>Nueva version disponible</span>
+        <button class="btn btn-sm btn-primary" id="update-btn">Recargar</button>
       </div>
     </div>
 

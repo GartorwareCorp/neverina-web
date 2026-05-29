@@ -31,10 +31,10 @@ const HIST_HUMIDITY_INVALID = 255;
 
 // Error bitmask flags (must match ERR_* constants in main.cpp)
 const ERROR_NAMES = {
-  0x01: "Motor controller failure",
-  0x02: "Temperature sensor lost",
-  0x04: "Ambient sensor failure",
-  0x08: "History storage failed",
+  0x01: "Fallo del controlador del motor",
+  0x02: "Sonda de temperatura perdida",
+  0x04: "Fallo del sensor ambiente",
+  0x08: "Fallo al guardar el historial",
 };
 const HIST_FRAME_HEADER_SIZE = 4;
 const HIST_FRAME_FLAG_LAST = 0x01;
@@ -100,9 +100,9 @@ function neverina() {
     histCycleStats: { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null },
     histThermalStats: { coolingRateCPerMin: null, heatLeakRateCPerMin: null },
     histRangeOptions: [
-      { label: "5min", ms: 5 * 60 * 1000 },
-      { label: "15min", ms: 15 * 60 * 1000 },
-      { label: "30min", ms: 30 * 60 * 1000 },
+      { label: "5 min", ms: 5 * 60 * 1000 },
+      { label: "15 min", ms: 15 * 60 * 1000 },
+      { label: "30 min", ms: 30 * 60 * 1000 },
       { label: "1h", ms: 1 * 60 * 60 * 1000 },
       { label: "2h", ms: 2 * 60 * 60 * 1000 },
       { label: "4h", ms: 4 * 60 * 60 * 1000 },
@@ -180,7 +180,7 @@ function neverina() {
 
     async connect() {
       if (!navigator.bluetooth) {
-        alert("Web Bluetooth is not supported.\nUse Chrome on Desktop or Android.");
+        alert("Web Bluetooth no es compatible.\nUsa Chrome en ordenador o Android.");
         return;
       }
       if (this.connected || this.connecting) return;
@@ -194,7 +194,7 @@ function neverina() {
         await this._connectToDevice(device);
       } catch (err) {
         if (err.name !== "NotFoundError") {
-          alert("Connection failed: " + err.message);
+          alert("Error de conexion: " + err.message);
         }
         console.error("Connection failed:", err);
       } finally {
@@ -295,24 +295,24 @@ function neverina() {
 
     _validateParams() {
       const e = {};
-      if (this.params.minOff < 3) e.minOff = "Minimum 3 min";
-      if (this.params.minOff > 10) e.minOff = "Maximum 10 min";
-      if (this.params.maxOn < 10) e.maxOn = "Minimum 10 min";
-      if (this.params.maxOn > 120) e.maxOn = "Maximum 120 min (2 h)";
-      if (this.params.maxOff < 3) e.maxOff = "Minimum 3 min";
-      if (this.params.maxOff > 480) e.maxOff = "Maximum 480 min (8 h)";
-      if (this.params.cooldown < 3) e.cooldown = "Minimum 3 min";
-      if (this.params.cooldown > 480) e.cooldown = "Maximum 480 min (8 h)";
+      if (this.params.minOff < 3) e.minOff = "Minimo 3 min";
+      if (this.params.minOff > 10) e.minOff = "Maximo 10 min";
+      if (this.params.maxOn < 10) e.maxOn = "Minimo 10 min";
+      if (this.params.maxOn > 120) e.maxOn = "Maximo 120 min (2 h)";
+      if (this.params.maxOff < 3) e.maxOff = "Minimo 3 min";
+      if (this.params.maxOff > 480) e.maxOff = "Maximo 480 min (8 h)";
+      if (this.params.cooldown < 3) e.cooldown = "Minimo 3 min";
+      if (this.params.cooldown > 480) e.cooldown = "Maximo 480 min (8 h)";
       if (this.params.minOff > this.params.cooldown || this.params.cooldown > this.params.maxOff) {
-        e.cooldown = "Min off ≤ Cooldown ≤ Max off required";
+        e.cooldown = "Debe cumplirse: Min OFF ≤ Enfriamiento ≤ Max OFF";
       }
-      if (this.params.tempInt < 5) e.tempInt = "Minimum 5 s";
-      if (this.params.tempInt > 60) e.tempInt = "Maximum 60 s";
-      if (this.params.ambOffset < -20 || this.params.ambOffset > 20) e.ambOffset = "Range −20 to 20 °C";
-      if (this.params.effStop < -10 || this.params.effStop > 15) e.effStop = "Range −10 to 15 °C";
-      if (this.params.slopeStop < -1 || this.params.slopeStop > 0) e.slopeStop = "Range −1.0 to 0.0 °C/min";
-      if (this.params.minOn < 3) e.minOn = "Minimum 3 min";
-      if (this.params.minOn > 10) e.minOn = "Maximum 10 min";
+      if (this.params.tempInt < 5) e.tempInt = "Minimo 5 s";
+      if (this.params.tempInt > 60) e.tempInt = "Maximo 60 s";
+      if (this.params.ambOffset < -20 || this.params.ambOffset > 20) e.ambOffset = "Rango −20 a 20 °C";
+      if (this.params.effStop < -10 || this.params.effStop > 15) e.effStop = "Rango −10 a 15 °C";
+      if (this.params.slopeStop < -1 || this.params.slopeStop > 0) e.slopeStop = "Rango −1.0 a 0.0 °C/min";
+      if (this.params.minOn < 3) e.minOn = "Minimo 3 min";
+      if (this.params.minOn > 10) e.minOn = "Maximo 10 min";
       return e;
     },
 
@@ -352,7 +352,7 @@ function neverina() {
         await wf(this._chars.SLOPE_STOP, this.params.slopeStop);
         await wu(this._chars.MIN_ON, this._minutesToSeconds(this.params.minOn));
       } catch (err) {
-        this.saveError = err.message || "Write failed";
+        this.saveError = err.message || "Error de escritura";
       } finally {
         this.saving = false;
       }
@@ -370,7 +370,7 @@ function neverina() {
 
     // Trigger OTA mode on the device via BLE.
     async triggerOta() {
-      if (!confirm("The device will stop the thermostat and enter firmware update mode.\n\nContinue?")) return;
+      if (!confirm("El dispositivo detendra el termostato y entrara en modo de actualizacion de firmware.\n\n¿Continuar?")) return;
       try {
         const buf = new ArrayBuffer(4);
         new DataView(buf).setUint32(0, 0xdeadbeef, true);
@@ -379,7 +379,7 @@ function neverina() {
       } catch (err) {
         // Disconnection mid-write is expected — treat as success
         if (err.name !== "NetworkError") {
-          alert("OTA trigger failed: " + err.message);
+          alert("Error al activar OTA: " + err.message);
         }
       }
     },
@@ -387,7 +387,7 @@ function neverina() {
     // ── Helpers ────────────────────────────────────────────────
 
     stateLabel() {
-      return ["OFF", "CoolDown", "ON"][this.status.state] ?? "—";
+      return ["APAGADO", "ENFRIAMIENTO", "ENCENDIDO"][this.status.state] ?? "—";
     },
 
     stateBadgeClass() {
@@ -699,7 +699,7 @@ function neverina() {
         this._chars.HIST_DATA.addEventListener("characteristicvaluechanged", onNotification);
 
         const timeout = setTimeout(() => {
-          fail(new Error("History dump timeout (type=" + type + ", req=" + requestId + ")"));
+          fail(new Error("Tiempo de espera agotado al volcar historial (tipo=" + type + ", req=" + requestId + ")"));
         }, 30000);
 
         const cmd = new ArrayBuffer(7);
@@ -867,14 +867,30 @@ function neverina() {
         rangeMs: xMax - xMin,
       });
 
-      // State totals clipped to the visible window [xMin, xMax]
+      // Stats window excludes the first and last visible state segments,
+      // which are typically partial and would skew averages.
+      const transitionTimes = [];
+      for (let i = 0; i + 1 < stateData.length; i += 1) {
+        const prev = stateData[i].y;
+        const next = stateData[i + 1].y;
+        const at = stateData[i + 1].x;
+        if (prev !== next && at > xMin && at < xMax) transitionTimes.push(at);
+      }
+      const statsMin = transitionTimes.length >= 2 ? transitionTimes[0] : null;
+      const statsMax = transitionTimes.length >= 2 ? transitionTimes[transitionTimes.length - 1] : null;
+      const hasStatsWindow = Number.isFinite(statsMin) && Number.isFinite(statsMax) && statsMax > statsMin;
+
+      // State totals clipped to the stats window [statsMin, statsMax]
       {
+        if (!hasStatsWindow) {
+          this.histStateTotals = { offMs: 0, cooldownMs: 0, onMs: 0, totalMs: 0 };
+        } else {
         let offMs = 0;
         let cooldownMs = 0;
         let onMs = 0;
         for (let i = 0; i + 1 < stateData.length; i += 1) {
-          const segStart = Math.max(stateData[i].x, xMin);
-          const segEnd = Math.min(stateData[i + 1].x, xMax);
+          const segStart = Math.max(stateData[i].x, statsMin);
+          const segEnd = Math.min(stateData[i + 1].x, statsMax);
           const dt = segEnd - segStart;
           if (dt <= 0) continue;
           if (stateData[i].y === 0) offMs += dt;
@@ -882,11 +898,13 @@ function neverina() {
           else if (stateData[i].y === 2) onMs += dt;
         }
         this.histStateTotals = { offMs, cooldownMs, onMs, totalMs: offMs + cooldownMs + onMs };
+        }
       }
 
-      // Temperature stats for visible window (time-weighted average)
+      // Temperature stats for stats window (time-weighted average)
       const _computeStats = (data) => {
-        const visible = data.filter((p) => p.x >= xMin && p.x <= xMax && Number.isFinite(p.y));
+        if (!hasStatsWindow) return { min: null, avg: null, max: null };
+        const visible = data.filter((p) => p.x >= statsMin && p.x <= statsMax && Number.isFinite(p.y));
         if (visible.length === 0) return { min: null, avg: null, max: null };
         let min = Infinity;
         let max = -Infinity;
@@ -908,78 +926,83 @@ function neverina() {
 
       // ── Compressor cycle & thermal performance stats ────────────────
       {
-        const onSegs = [];
-        const nonOnSegs = [];
-        let curOnStart = null;
-        let curNonOnStart = null;
-        let lastOnEnd = null;
-        const cycleOnMs = [];
-        const interCycleOffMs = [];
+        if (!hasStatsWindow) {
+          this.histCycleStats = { count: null, avgOnSec: null, avgOffSec: null, startsPerHour: null };
+          this.histThermalStats = { coolingRateCPerMin: null, heatLeakRateCPerMin: null };
+        } else {
+          const onSegs = [];
+          const nonOnSegs = [];
+          let curOnStart = null;
+          let curNonOnStart = null;
+          let lastOnEnd = null;
+          const cycleOnMs = [];
+          const interCycleOffMs = [];
 
-        for (let i = 0; i + 1 < stateData.length; i++) {
-          const clampedStart = Math.max(stateData[i].x, xMin);
-          const clampedEnd = Math.min(stateData[i + 1].x, xMax);
-          if (clampedEnd <= clampedStart) continue;
-          const state = stateData[i].y;
+          for (let i = 0; i + 1 < stateData.length; i++) {
+            const clampedStart = Math.max(stateData[i].x, statsMin);
+            const clampedEnd = Math.min(stateData[i + 1].x, statsMax);
+            if (clampedEnd <= clampedStart) continue;
+            const state = stateData[i].y;
 
-          if (state === 2) {
-            // Entering ON
-            if (curNonOnStart !== null) {
-              nonOnSegs.push({ start: curNonOnStart, end: clampedStart });
-              curNonOnStart = null;
+            if (state === 2) {
+              // Entering ON
+              if (curNonOnStart !== null) {
+                nonOnSegs.push({ start: curNonOnStart, end: clampedStart });
+                curNonOnStart = null;
+              }
+              if (curOnStart === null) {
+                curOnStart = clampedStart;
+                if (lastOnEnd !== null) interCycleOffMs.push(clampedStart - lastOnEnd);
+              }
+            } else {
+              // Leaving ON (or never was ON)
+              if (curOnStart !== null) {
+                cycleOnMs.push(clampedStart - curOnStart);
+                onSegs.push({ start: curOnStart, end: clampedStart });
+                lastOnEnd = clampedStart;
+                curOnStart = null;
+              }
+              if (curNonOnStart === null) curNonOnStart = clampedStart;
             }
-            if (curOnStart === null) {
-              curOnStart = clampedStart;
-              if (lastOnEnd !== null) interCycleOffMs.push(clampedStart - lastOnEnd);
-            }
-          } else {
-            // Leaving ON (or never was ON)
-            if (curOnStart !== null) {
-              cycleOnMs.push(clampedStart - curOnStart);
-              onSegs.push({ start: curOnStart, end: clampedStart });
-              lastOnEnd = clampedStart;
-              curOnStart = null;
-            }
-            if (curNonOnStart === null) curNonOnStart = clampedStart;
           }
-        }
-        // Close open segments at window edge
-        if (curOnStart !== null) {
-          cycleOnMs.push(xMax - curOnStart);
-          onSegs.push({ start: curOnStart, end: xMax });
-        }
-        if (curNonOnStart !== null) nonOnSegs.push({ start: curNonOnStart, end: xMax });
-
-        const cycleCount = cycleOnMs.length;
-        const avgOnSec = cycleCount > 0 ? cycleOnMs.reduce((a, b) => a + b, 0) / cycleCount / 1000 : null;
-        const avgOffSec =
-          interCycleOffMs.length > 0
-            ? interCycleOffMs.reduce((a, b) => a + b, 0) / interCycleOffMs.length / 1000
-            : null;
-        const windowMs = xMax - xMin;
-        const startsPerHour = windowMs > 0 ? cycleCount / (windowMs / 3600000) : null;
-
-        // Time-weighted mean slope (°C/min) across a list of {start, end} segments
-        const _segSlope = (segs) => {
-          let wSum = 0;
-          let wTot = 0;
-          for (const seg of segs) {
-            const pts = tempData.filter((p) => p.x >= seg.start && p.x <= seg.end && p.y !== null);
-            if (pts.length < 2) continue;
-            const dtMs = pts[pts.length - 1].x - pts[0].x;
-            const dT = pts[pts.length - 1].y - pts[0].y;
-            if (dtMs <= 0) continue;
-            wSum += (dT / (dtMs / 60000)) * dtMs;
-            wTot += dtMs;
+          // Close open segments at window edge
+          if (curOnStart !== null) {
+            cycleOnMs.push(statsMax - curOnStart);
+            onSegs.push({ start: curOnStart, end: statsMax });
           }
-          return wTot > 0 ? wSum / wTot : null;
-        };
+          if (curNonOnStart !== null) nonOnSegs.push({ start: curNonOnStart, end: statsMax });
 
-        const coolingRateCPerMin = _segSlope(onSegs);
-        const heatLeakRateCPerMin = _segSlope(nonOnSegs);
+          const cycleCount = cycleOnMs.length;
+          const avgOnSec = cycleCount > 0 ? cycleOnMs.reduce((a, b) => a + b, 0) / cycleCount / 1000 : null;
+          const avgOffSec =
+            interCycleOffMs.length > 0
+              ? interCycleOffMs.reduce((a, b) => a + b, 0) / interCycleOffMs.length / 1000
+              : null;
+          const windowMs = statsMax - statsMin;
+          const startsPerHour = windowMs > 0 ? cycleCount / (windowMs / 3600000) : null;
 
-        this.histCycleStats = { count: cycleCount, avgOnSec, avgOffSec, startsPerHour };
-        this.histThermalStats = { coolingRateCPerMin, heatLeakRateCPerMin };
+          // Time-weighted mean slope (°C/min) across a list of {start, end} segments
+          const _segSlope = (segs) => {
+            let wSum = 0;
+            let wTot = 0;
+            for (const seg of segs) {
+              const pts = tempData.filter((p) => p.x >= seg.start && p.x <= seg.end && p.y !== null);
+              if (pts.length < 2) continue;
+              const dtMs = pts[pts.length - 1].x - pts[0].x;
+              const dT = pts[pts.length - 1].y - pts[0].y;
+              if (dtMs <= 0) continue;
+              wSum += (dT / (dtMs / 60000)) * dtMs;
+              wTot += dtMs;
+            }
+            return wTot > 0 ? wSum / wTot : null;
+          };
+
+          const coolingRateCPerMin = _segSlope(onSegs);
+          const heatLeakRateCPerMin = _segSlope(nonOnSegs);
+
+          this.histCycleStats = { count: cycleCount, avgOnSec, avgOffSec, startsPerHour };
+          this.histThermalStats = { coolingRateCPerMin, heatLeakRateCPerMin };
+        }
       }
 
       // Y - axis
@@ -1034,7 +1057,7 @@ function neverina() {
         data: {
           datasets: [
             {
-              label: "Compressor",
+              label: "Compresor",
               data: stateData,
               borderColor: "rgba(250, 204, 21, 0.32)",
               backgroundColor: "rgba(250, 204, 21, 0.12)",
@@ -1045,7 +1068,7 @@ function neverina() {
               yAxisID: "yState",
             },
             {
-              label: "Fridge (°C)",
+              label: "Nevera (°C)",
               data: tempData,
               borderColor: "rgb(239, 68, 68)",
               borderWidth: 1.5,
@@ -1054,7 +1077,7 @@ function neverina() {
               yAxisID: "yTemp",
             },
             {
-              label: "Ambient (°C)",
+              label: "Ambiente (°C)",
               data: ambData,
               borderColor: "rgb(249, 115, 22)",
               borderWidth: 1.5,
@@ -1063,7 +1086,7 @@ function neverina() {
               yAxisID: "yTemp",
             },
             {
-              label: "Humidity (%)",
+              label: "Humedad (%)",
               data: humData,
               borderColor: "rgb(20, 184, 166)",
               borderWidth: 1.5,
@@ -1162,7 +1185,7 @@ function neverina() {
                     return `${ctx.dataset.label}: —`;
                   }
                   if (ctx.dataset.yAxisID === "yState") {
-                    return `${ctx.dataset.label}: ${["OFF", "CoolDown", "ON"][ctx.parsed.y] ?? "?"}`;
+                    return `${ctx.dataset.label}: ${["APAGADO", "ENFRIAMIENTO", "ENCENDIDO"][ctx.parsed.y] ?? "?"}`;
                   }
                   if (ctx.dataset.yAxisID === "yHum") {
                     return `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(0)} %`;
